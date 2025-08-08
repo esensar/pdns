@@ -72,22 +72,21 @@ bool RedisClient::keyExists(const std::string& key)
   return false;
 }
 
-RedisClient::RedisConnection::RedisConnection(const std::string& url)
+RedisClient::RedisConnection::RedisConnection(const ComboAddress& address)
 {
   // The `redisContext` type represents the connection
   // to the Redis server. Here, we connect to the
   // default host and port.
-  d_context = redisConnect("127.0.0.1", 6379);
+  d_context = redisConnect(address.toString().c_str(), address.getPort());
 
   // Check if the context is null or if a specific
   // error occurred.
   if (d_context == nullptr || d_context->err) {
     if (d_context != nullptr) {
-      printf("Error: %s\n", d_context->errstr);
-      // handle error
+      warnlog("Error: %s", d_context->errstr);
     }
     else {
-      printf("Can't allocate redis context\n");
+      warnlog("Can't allocate redis context");
     }
   }
 }
