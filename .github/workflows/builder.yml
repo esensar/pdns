@@ -2,15 +2,7 @@
 name: 'Test package building for specific distributions'
 
 on:
-  workflow_call:
-    inputs:
-      branch-name:
-        description: 'Checkout to a specific branch'
-        required: true
-        default: ''
-        type: string
-  schedule:
-    - cron: '0 1 * * *'
+  workflow_dispatch:
 
 permissions: # least privileges, see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions
   contents: read
