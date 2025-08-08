@@ -283,3 +283,31 @@ bool CDBKVStore::keyExists(const std::string& key)
 }
 
 #endif /* HAVE_CDB */
+
+#ifdef HAVE_REDIS
+
+RedisKVStore::RedisKVStore(const std::string& fname, time_t refreshDelay)
+{
+  *(d_redis.write_lock()) = std::make_unique<RedisClient>("");
+}
+
+RedisKVStore::~RedisKVStore()
+{
+}
+
+bool RedisKVStore::reload()
+{
+  return true;
+}
+
+bool RedisKVStore::getValue(const std::string& key, std::string& value)
+{
+  return (*d_redis.read_lock())->getValue(key, value);
+}
+
+bool RedisKVStore::keyExists(const std::string& key)
+{
+  return (*d_redis.read_lock())->keyExists(key);
+}
+
+#endif // HAVE_REDIS
