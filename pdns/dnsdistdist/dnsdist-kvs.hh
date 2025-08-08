@@ -22,6 +22,7 @@
 #pragma once
 
 #include "dnsdist.hh"
+#include "iputils.hh"
 
 class KeyValueLookupKey
 {
@@ -229,7 +230,7 @@ private:
 class RedisKVStore : public KeyValueStore
 {
 public:
-  RedisKVStore(const std::string& fname, time_t refreshDelay);
+  RedisKVStore(const ComboAddress& address);
   ~RedisKVStore();
 
   bool keyExists(const std::string& key) override;
