@@ -21,6 +21,7 @@
  */
 #pragma once
 
+#include "iputils.hh"
 #include <hiredis/hiredis.h>
 #include <memory>
 #include <string>
@@ -99,8 +100,8 @@ public:
 class RedisClient
 {
 public:
-  RedisClient(const std::string& url) :
-    d_connection(url)
+  RedisClient(const ComboAddress& address) :
+    d_connection(address)
   {
     d_command = std::make_unique<RedisGetCommand>();
   }
@@ -114,7 +115,7 @@ private:
   class RedisConnection
   {
   public:
-    RedisConnection(const std::string& url);
+    RedisConnection(const ComboAddress& address);
     ~RedisConnection();
     void reconnect();
     redisContext* getConnection()

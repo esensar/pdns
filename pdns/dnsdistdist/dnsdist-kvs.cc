@@ -286,9 +286,9 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::string& fname, time_t refreshDelay)
+RedisKVStore::RedisKVStore(const ComboAddress& address)
 {
-  *(d_redis.write_lock()) = std::make_unique<RedisClient>("");
+  *(d_redis.write_lock()) = std::make_unique<RedisClient>(address);
 }
 
 RedisKVStore::~RedisKVStore()

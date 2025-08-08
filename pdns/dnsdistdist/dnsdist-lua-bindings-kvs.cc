@@ -44,11 +44,19 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
 #endif /* HAVE_CDB */
 
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisKVStore", [client](const std::string& fname, time_t refreshDelay) {
+  luaCtx.writeFunction("newRedisKVStore", [client](const std::string& address) {
     if (client) {
       return std::shared_ptr<KeyValueStore>(nullptr);
     }
-    return std::shared_ptr<KeyValueStore>(new RedisKVStore(fname, refreshDelay));
+
+    ComboAddress redisAddress;
+    try {
+      redisAddress = ComboAddress(address);
+    }
+    catch (const PDNSException& e) {
+      throw std::runtime_error(std::string("Error parsing the address for the Redis KVStore: ") + e.reason);
+    }
+    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisAddress));
   });
 #endif /* HAVE_REDIS */
 
