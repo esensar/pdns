@@ -221,3 +221,22 @@ private:
 };
 
 #endif /* HAVE_LMDB */
+
+#ifdef HAVE_REDIS
+
+#include "redis.hh"
+
+class RedisKVStore : public KeyValueStore
+{
+public:
+  RedisKVStore(const std::string& fname, time_t refreshDelay);
+  ~RedisKVStore();
+
+  bool keyExists(const std::string& key) override;
+  bool getValue(const std::string& key, std::string& value) override;
+  bool reload() override;
+
+private:
+  SharedLockGuarded<std::unique_ptr<RedisClient>> d_redis{nullptr};
+};
+#endif // HAVE_REDIS

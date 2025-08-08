@@ -85,6 +85,7 @@ subdir('meson' / 'doh2')                    # DNS over HTTP/2
 subdir('meson' / 'doq')                     # DNS over QUIC
 subdir('meson' / 'doh3')                    # DNS over HTTP/3
 subdir('meson' / 'yaml-configuration')      # YAML configuration
+subdir('meson' / 'redis')                   # Redis
 
 common_sources = []
 
@@ -248,6 +249,12 @@ conditional_sources = {
     ],
     'condition': dep_libquiche.found(),
    },
+  'redis': {
+    'sources': [
+      src_dir / 'redis.cc',
+    ],
+    'condition': get_option('redis').allowed() and dep_redis.found(),
+  },
 }
 
 foreach name, info: conditional_sources

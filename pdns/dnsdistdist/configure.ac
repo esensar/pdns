@@ -81,6 +81,7 @@ AS_IF([test "x$LUAPC" = "xluajit"], [
 PDNS_CHECK_LUA_HPP
 
 AM_CONDITIONAL([HAVE_CDB], [false])
+AM_CONDITIONAL([HAVE_REDIS], [false])
 AM_CONDITIONAL([HAVE_GNUTLS], [false])
 AM_CONDITIONAL([HAVE_LIBH2OEVLOOP], [false])
 AM_CONDITIONAL([HAVE_LIBSSL], [false])
@@ -144,6 +145,7 @@ AS_IF([test "x$enable_yaml" != "xno"], [
 ])
 
 DNSDIST_WITH_CDB
+DNSDIST_WITH_REDIS
 PDNS_CHECK_LMDB
 PDNS_ENABLE_IPCIPHER
 PDNS_CHECK_AARCH64_UINT64X2_T
@@ -319,6 +321,10 @@ AS_IF([test "x$CDB_LIBS" != "x"],
 AS_IF([test "x$LMDB_LIBS" != "x"],
   [AC_MSG_NOTICE([lmdb: yes])],
   [AC_MSG_NOTICE([lmdb: no])]
+)
+AS_IF([test "x$REDIS_LIBS" != "x"],
+  [AC_MSG_NOTICE([redis: yes])],
+  [AC_MSG_NOTICE([redis: no])]
 )
 AS_IF([test "x$enable_yaml" != "xno"],
   [AC_MSG_NOTICE([YAML configuration: yes])],

@@ -144,6 +144,7 @@ EXTRA_DIST=COPYING \
 	   kqueuemplexer.cc \
 	   portsmplexer.cc \
 	   cdb.cc cdb.hh \
+	   redis.cc redis.hh \
 	   standalone_fuzz_target_runner.cc \
 	   ext/lmdb-safe/lmdb-safe.cc ext/lmdb-safe/lmdb-safe.hh \
 	   ext/protozero/include/* \
@@ -477,6 +478,13 @@ dnsdist_LDADD += $(CDB_LDFLAGS) $(CDB_LIBS)
 testrunner_LDADD += $(CDB_LDFLAGS) $(CDB_LIBS)
 dnsdist_SOURCES += cdb.cc cdb.hh
 testrunner_SOURCES += cdb.cc cdb.hh
+endif
+
+if HAVE_REDIS
+dnsdist_LDADD += $(REDIS_LDFLAGS) $(REDIS_LIBS)
+testrunner_LDADD += $(REDIS_LDFLAGS) $(REDIS_LIBS)
+dnsdist_SOURCES += redis.cc redis.hh
+testrunner_SOURCES += redis.cc redis.hh
 endif
 
 if HAVE_RE2

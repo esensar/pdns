@@ -43,7 +43,16 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
   });
 #endif /* HAVE_CDB */
 
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#ifdef HAVE_REDIS
+  luaCtx.writeFunction("newRedisKVStore", [client](const std::string& fname, time_t refreshDelay) {
+    if (client) {
+      return std::shared_ptr<KeyValueStore>(nullptr);
+    }
+    return std::shared_ptr<KeyValueStore>(new RedisKVStore(fname, refreshDelay));
+  });
+#endif /* HAVE_REDIS */
+
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   /* Key Value Store objects */
   luaCtx.writeFunction("KeyValueLookupKeySourceIP", [](std::optional<uint8_t> v4Mask, std::optional<uint8_t> v6Mask, std::optional<bool> includePort) {
     return std::shared_ptr<KeyValueLookupKey>(new KeyValueLookupKeySourceIP(v4Mask ? *v4Mask : 32, v6Mask ? *v6Mask : 128, includePort ? *includePort : false));
@@ -113,5 +122,5 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
 
     return kvs->reload();
   });
-#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) */
+#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 }
