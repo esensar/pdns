@@ -22,6 +22,11 @@
 #include "dnsdist.hh"
 #include "dnsdist-kvs.hh"
 #include "dnsdist-lua.hh"
+#ifdef HAVE_REDIS
+#include "redis.hh"
+#endif // HAVE_REDIS
+#include <boost/algorithm/string/predicate.hpp>
+#include <memory>
 
 void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] bool client)
 {
@@ -44,19 +49,44 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
 #endif /* HAVE_CDB */
 
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisKVStore", [client](const std::string& address) {
+  luaCtx.writeFunction("newRedisKVStore", [client](const std::string& address, boost::optional<LuaAssociativeTable<string>> vars) {
     if (client) {
       return std::shared_ptr<KeyValueStore>(nullptr);
     }
 
     ComboAddress redisAddress;
+    std::unique_ptr<RedisCommand> command;
+    std::string lookupAction;
+    boost::optional<std::string> dataName;
+    getOptionalValue<std::string>(vars, "dataName", dataName);
+    if (getOptionalValue<std::string>(vars, "lookupAction", lookupAction) > 0 && !boost::iequals(lookupAction, "get")) {
+      if (!dataName) {
+        throw std::runtime_error("Option 'dataName' is required for lookup action " + lookupAction);
+      }
+      if (boost::iequals(lookupAction, "hget")) {
+        command = std::make_unique<RedisHGetCommand>(dataName.get());
+      }
+      else {
+        throw std::runtime_error("Unknown lookup action: " + lookupAction);
+      }
+    }
+    else {
+      if (dataName) {
+        command = std::make_unique<RedisGetCommand>(dataName.get());
+      }
+      else {
+        command = std::make_unique<RedisGetCommand>();
+      }
+    }
+
+    checkAllParametersConsumed("newRedisKVStore", vars);
     try {
       redisAddress = ComboAddress(address);
     }
     catch (const PDNSException& e) {
       throw std::runtime_error(std::string("Error parsing the address for the Redis KVStore: ") + e.reason);
     }
-    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisAddress));
+    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisAddress, std::move(command)));
   });
 #endif /* HAVE_REDIS */
 
