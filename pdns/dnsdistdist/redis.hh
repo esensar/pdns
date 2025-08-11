@@ -92,18 +92,39 @@ public:
 class RedisGetCommand : public RedisCommand
 {
 public:
+  RedisGetCommand(const std::string& prefix = "") :
+    prefix(prefix)
+  {
+  }
   ~RedisGetCommand() = default;
   RedisStringReply getValue(redisContext* context, const std::string& key) override;
   RedisIntReply keyExists(redisContext* context, const std::string& key) override;
+
+private:
+  std::string prefix;
+};
+
+class RedisHGetCommand : public RedisCommand
+{
+public:
+  RedisHGetCommand(const std::string& hash_key) :
+    hash_key(hash_key)
+  {
+  }
+  ~RedisHGetCommand() = default;
+  RedisStringReply getValue(redisContext* context, const std::string& key) override;
+  RedisIntReply keyExists(redisContext* context, const std::string& key) override;
+
+private:
+  std::string hash_key;
 };
 
 class RedisClient
 {
 public:
-  RedisClient(const ComboAddress& address) :
-    d_connection(address)
+  RedisClient(const ComboAddress& address, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
+    d_connection(address), d_command(std::move(command))
   {
-    d_command = std::make_unique<RedisGetCommand>();
   }
 
   bool getValue(const std::string& key, std::string& value);

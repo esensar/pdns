@@ -230,7 +230,7 @@ private:
 class RedisKVStore : public KeyValueStore
 {
 public:
-  RedisKVStore(const ComboAddress& address);
+  RedisKVStore(const ComboAddress& address, std::unique_ptr<RedisCommand>&& command);
   ~RedisKVStore();
 
   bool keyExists(const std::string& key) override;

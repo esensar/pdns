@@ -33,13 +33,25 @@
 
 RedisStringReply RedisGetCommand::getValue(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "GET %s", key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "GET %s%s", prefix.c_str(), key.c_str()));
   return RedisStringReply(reply);
 }
 
 RedisIntReply RedisGetCommand::keyExists(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "EXISTS %s", key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "EXISTS %s%s", prefix.c_str(), key.c_str()));
+  return RedisIntReply(reply);
+}
+
+RedisStringReply RedisHGetCommand::getValue(redisContext* context, const std::string& key)
+{
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HGET %s %s", hash_key.c_str(), key.c_str()));
+  return RedisStringReply(reply);
+}
+
+RedisIntReply RedisHGetCommand::keyExists(redisContext* context, const std::string& key)
+{
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HEXISTS %s %s", hash_key.c_str(), key.c_str()));
   return RedisIntReply(reply);
 }
 
