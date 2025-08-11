@@ -3088,6 +3088,9 @@ static void reportFeatures()
   cout << "recvmmsg/sendmmsg ";
 #endif
 #endif /* DISABLE_RECVMMSG */
+#ifdef HAVE_REDIS
+  cout << "redis ";
+#endif
 #ifdef HAVE_NET_SNMP
   cout << "snmp ";
 #endif
