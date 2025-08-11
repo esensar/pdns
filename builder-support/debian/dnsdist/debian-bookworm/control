@@ -5,6 +5,7 @@ Maintainer: PowerDNS.COM BV <powerdns.support.sales@powerdns.com>
 Uploaders: PowerDNS.COM BV <powerdns.support.sales@powerdns.com>
 Build-Depends: debhelper (>= 10),
                clang,
+               hiredis-dev,
                libboost-all-dev,
                libbpf-dev [linux-any],
                libcap-dev,
