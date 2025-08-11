@@ -408,6 +408,7 @@ deps = [
   dep_threads,
   dep_libbpf,
   dep_libxdp,
+  dep_redis,
   dep_dnsdist_rust_lib,
   dep_yaml_settings_docs,
 ]
