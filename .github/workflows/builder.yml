@@ -26,7 +26,8 @@ jobs:
       matrix:
         product: ['dnsdist']
         os:
-          - debian-bullseye
+          - debian-bookworm
+          - debian-trixie
         runner-os: ${{ fromJson(needs.prepare.outputs.runnerlist )}}
       fail-fast: false
     steps:
