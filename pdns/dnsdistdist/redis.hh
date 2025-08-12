@@ -26,6 +26,7 @@
 #include <memory>
 #include <string>
 
+template <typename T>
 class RedisReply
 {
 public:
@@ -45,11 +46,13 @@ public:
     return d_reply;
   }
 
+  virtual T getValue() = 0;
+
 protected:
   redisReply* d_reply;
 };
 
-class RedisStringReply : public RedisReply
+class RedisStringReply : public RedisReply<std::string>
 {
 public:
   RedisStringReply(redisReply* reply) :
@@ -59,15 +62,33 @@ public:
   ~RedisStringReply() = default;
   bool ok() override
   {
-    return d_reply && d_reply->str;
+    return d_reply && (d_reply->str);
   }
-  std::string getValue()
+  std::string getValue() override
   {
     return std::string(d_reply->str);
   }
 };
 
-class RedisIntReply : public RedisReply
+class RedisIntAsStringReply : public RedisReply<std::string>
+{
+public:
+  RedisIntAsStringReply(redisReply* reply) :
+    RedisReply(reply)
+  {
+  }
+  ~RedisIntAsStringReply() = default;
+  bool ok() override
+  {
+    return d_reply && d_reply->type == REDIS_REPLY_INTEGER;
+  }
+  std::string getValue() override
+  {
+    return std::to_string(d_reply->integer);
+  }
+};
+
+class RedisIntReply : public RedisReply<bool>
 {
 public:
   RedisIntReply(redisReply* reply) :
@@ -75,9 +96,53 @@ public:
   {
   }
   ~RedisIntReply() = default;
-  long long getValue()
+  bool getValue()
   {
-    return d_reply->integer;
+    return d_reply->integer > 0;
+  }
+};
+
+class RedisScanAsStringReply : public RedisReply<std::string>
+{
+public:
+  RedisScanAsStringReply(redisReply* reply) :
+    RedisReply(reply)
+  {
+  }
+  ~RedisScanAsStringReply() = default;
+  bool ok() override
+  {
+    return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements == 2;
+  }
+  std::string getValue() override
+  {
+    auto members = d_reply->element[1];
+    std::string result;
+    for (size_t i = 0; i < members->elements; i++) {
+      if (i) {
+        result += ", ";
+      }
+      result += members->element[i]->str;
+    }
+    return result;
+  }
+};
+
+class RedisScanAsBoolReply : public RedisReply<bool>
+{
+public:
+  RedisScanAsBoolReply(redisReply* reply) :
+    RedisReply(reply)
+  {
+  }
+  ~RedisScanAsBoolReply() = default;
+  bool ok() override
+  {
+    return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements == 2 && d_reply->element[0]->type == REDIS_REPLY_BIGNUM;
+  }
+  bool getValue() override
+  {
+    return std::strcmp(d_reply->element[0]->str, "0") != 0;
   }
 };
 
@@ -85,8 +150,8 @@ class RedisCommand
 {
 public:
   virtual ~RedisCommand() = default;
-  virtual RedisStringReply getValue(redisContext* context, const std::string& key) = 0;
-  virtual RedisIntReply keyExists(redisContext* context, const std::string& key) = 0;
+  virtual std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) = 0;
+  virtual std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) = 0;
 };
 
 class RedisGetCommand : public RedisCommand
@@ -97,8 +162,8 @@ public:
   {
   }
   ~RedisGetCommand() = default;
-  RedisStringReply getValue(redisContext* context, const std::string& key) override;
-  RedisIntReply keyExists(redisContext* context, const std::string& key) override;
+  std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
   std::string prefix;
@@ -112,17 +177,47 @@ public:
   {
   }
   ~RedisHGetCommand() = default;
-  RedisStringReply getValue(redisContext* context, const std::string& key) override;
-  RedisIntReply keyExists(redisContext* context, const std::string& key) override;
+  std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
   std::string hash_key;
 };
 
-class RedisClient
+class RedisSismemberCommand : public RedisCommand
 {
 public:
-  RedisClient(const ComboAddress& address, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
+  RedisSismemberCommand(const std::string& set_key) :
+    set_key(set_key)
+  {
+  }
+  ~RedisSismemberCommand() = default;
+  std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
+
+private:
+  std::string set_key;
+};
+
+class RedisSscanCommand : public RedisCommand
+{
+public:
+  RedisSscanCommand(const std::string& set_key) :
+    set_key(set_key)
+  {
+  }
+  ~RedisSscanCommand() = default;
+  std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
+
+private:
+  std::string set_key;
+};
+
+class RedisKVClient
+{
+public:
+  RedisKVClient(const ComboAddress& address, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
     d_connection(address), d_command(std::move(command))
   {
   }

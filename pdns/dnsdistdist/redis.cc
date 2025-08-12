@@ -31,40 +31,64 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-RedisStringReply RedisGetCommand::getValue(redisContext* context, const std::string& key)
+std::unique_ptr<RedisReply<std::string>> RedisGetCommand::getValue(redisContext* context, const std::string& key)
 {
   redisReply* reply = static_cast<redisReply*>(redisCommand(context, "GET %s%s", prefix.c_str(), key.c_str()));
-  return RedisStringReply(reply);
+  return std::make_unique<RedisStringReply>(reply);
 }
 
-RedisIntReply RedisGetCommand::keyExists(redisContext* context, const std::string& key)
+std::unique_ptr<RedisReply<bool>> RedisGetCommand::keyExists(redisContext* context, const std::string& key)
 {
   redisReply* reply = static_cast<redisReply*>(redisCommand(context, "EXISTS %s%s", prefix.c_str(), key.c_str()));
-  return RedisIntReply(reply);
+  return std::make_unique<RedisIntReply>(reply);
 }
 
-RedisStringReply RedisHGetCommand::getValue(redisContext* context, const std::string& key)
+std::unique_ptr<RedisReply<std::string>> RedisHGetCommand::getValue(redisContext* context, const std::string& key)
 {
   redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HGET %s %s", hash_key.c_str(), key.c_str()));
-  return RedisStringReply(reply);
+  return std::make_unique<RedisStringReply>(reply);
 }
 
-RedisIntReply RedisHGetCommand::keyExists(redisContext* context, const std::string& key)
+std::unique_ptr<RedisReply<bool>> RedisHGetCommand::keyExists(redisContext* context, const std::string& key)
 {
   redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HEXISTS %s %s", hash_key.c_str(), key.c_str()));
-  return RedisIntReply(reply);
+  return std::make_unique<RedisIntReply>(reply);
 }
 
-void RedisClient::reconnect()
+std::unique_ptr<RedisReply<std::string>> RedisSismemberCommand::getValue(redisContext* context, const std::string& key)
+{
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SISMEMBER %s %s", set_key.c_str(), key.c_str()));
+  return std::make_unique<RedisIntAsStringReply>(reply);
+}
+
+std::unique_ptr<RedisReply<bool>> RedisSismemberCommand::keyExists(redisContext* context, const std::string& key)
+{
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SISMEMBER %s %s", set_key.c_str(), key.c_str()));
+  return std::make_unique<RedisIntReply>(reply);
+}
+
+std::unique_ptr<RedisReply<std::string>> RedisSscanCommand::getValue(redisContext* context, const std::string& key)
+{
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %s 0 %s", set_key.c_str(), key.c_str()));
+  return std::make_unique<RedisScanAsStringReply>(reply);
+}
+
+std::unique_ptr<RedisReply<bool>> RedisSscanCommand::keyExists(redisContext* context, const std::string& key)
+{
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %s 0 %s", set_key.c_str(), key.c_str()));
+  return std::make_unique<RedisScanAsBoolReply>(reply);
+}
+
+void RedisKVClient::reconnect()
 {
   d_connection.reconnect();
 }
 
-bool RedisClient::getValue(const std::string& key, std::string& value)
+bool RedisKVClient::getValue(const std::string& key, std::string& value)
 {
   auto reply = d_command->getValue(d_connection.getConnection(), key);
-  if (reply.ok()) {
-    value = reply.getValue();
+  if (reply->ok()) {
+    value = reply->getValue();
     vinfolog("Got value %s for key '%s'", value, key);
     return true;
   }
@@ -73,18 +97,18 @@ bool RedisClient::getValue(const std::string& key, std::string& value)
   return false;
 }
 
-bool RedisClient::keyExists(const std::string& key)
+bool RedisKVClient::keyExists(const std::string& key)
 {
   auto reply = d_command->keyExists(d_connection.getConnection(), key);
-  if (reply.ok()) {
-    return reply.getValue() > 0;
+  if (reply->ok()) {
+    return reply->getValue();
   }
 
   vinfolog("Error while looking up key '%s' from Redis: %s", key, (d_connection.getConnection())->errstr);
   return false;
 }
 
-RedisClient::RedisConnection::RedisConnection(const ComboAddress& address)
+RedisKVClient::RedisConnection::RedisConnection(const ComboAddress& address)
 {
   // The `redisContext` type represents the connection
   // to the Redis server. Here, we connect to the
@@ -103,14 +127,14 @@ RedisClient::RedisConnection::RedisConnection(const ComboAddress& address)
   }
 }
 
-RedisClient::RedisConnection::~RedisConnection()
+RedisKVClient::RedisConnection::~RedisConnection()
 {
   if (d_context) {
     redisFree(d_context);
   }
 }
 
-void RedisClient::RedisConnection::reconnect()
+void RedisKVClient::RedisConnection::reconnect()
 {
   if (d_context) {
     redisReconnect(d_context);
