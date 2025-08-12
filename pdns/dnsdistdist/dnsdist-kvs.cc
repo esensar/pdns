@@ -286,8 +286,28 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const ComboAddress& address, std::unique_ptr<RedisCommand>&& command)
+RedisKVStore::RedisKVStore(const ComboAddress& address, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName)
 {
+  std::unique_ptr<RedisCommand> command;
+  if (lookupAction && !boost::iequals(lookupAction.get(), "get")) {
+    if (!dataName) {
+      throw std::runtime_error("Option 'dataName' is required for lookup action " + lookupAction.get());
+    }
+    if (boost::iequals(lookupAction.get(), "hget")) {
+      command = std::make_unique<RedisHGetCommand>(dataName.get());
+    }
+    else {
+      throw std::runtime_error("Unknown lookup action: " + lookupAction.get());
+    }
+  }
+  else {
+    if (dataName) {
+      command = std::make_unique<RedisGetCommand>(dataName.get());
+    }
+    else {
+      command = std::make_unique<RedisGetCommand>();
+    }
+  }
   *(d_redis.write_lock()) = std::make_unique<RedisClient>(address, std::move(command));
 }
 
