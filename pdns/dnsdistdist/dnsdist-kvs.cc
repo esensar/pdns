@@ -23,6 +23,7 @@
 #include "dnsdist-kvs.hh"
 #include "dolog.hh"
 
+#include <memory>
 #include <sys/stat.h>
 
 std::vector<std::string> KeyValueLookupKeySourceIP::getKeys(const ComboAddress& addr)
@@ -296,6 +297,12 @@ RedisKVStore::RedisKVStore(const ComboAddress& address, boost::optional<std::str
     if (boost::iequals(lookupAction.get(), "hget")) {
       command = std::make_unique<RedisHGetCommand>(dataName.get());
     }
+    else if (boost::iequals(lookupAction.get(), "sismember")) {
+      command = std::make_unique<RedisSismemberCommand>(dataName.get());
+    }
+    else if (boost::iequals(lookupAction.get(), "sscan")) {
+      command = std::make_unique<RedisSscanCommand>(dataName.get());
+    }
     else {
       throw std::runtime_error("Unknown lookup action: " + lookupAction.get());
     }
@@ -308,7 +315,7 @@ RedisKVStore::RedisKVStore(const ComboAddress& address, boost::optional<std::str
       command = std::make_unique<RedisGetCommand>();
     }
   }
-  *(d_redis.write_lock()) = std::make_unique<RedisClient>(address, std::move(command));
+  *(d_redis.write_lock()) = std::make_unique<RedisKVClient>(address, std::move(command));
 }
 
 RedisKVStore::~RedisKVStore()
