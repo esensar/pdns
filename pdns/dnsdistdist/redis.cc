@@ -19,12 +19,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#include "redis.hh"
-#include "dolog.hh"
-#include <hiredis/hiredis.h>
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#include "redis.hh"
+#include "dolog.hh"
+#include "yahttp/yahttp.hpp"
+#include <hiredis/hiredis.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -79,11 +81,6 @@ std::unique_ptr<RedisReply<bool>> RedisSscanCommand::keyExists(redisContext* con
   return std::make_unique<RedisScanAsBoolReply>(reply);
 }
 
-void RedisKVClient::reconnect()
-{
-  d_connection.reconnect();
-}
-
 bool RedisKVClient::getValue(const std::string& key, std::string& value)
 {
   auto reply = d_command->getValue(d_connection.getConnection(), key);
@@ -108,18 +105,40 @@ bool RedisKVClient::keyExists(const std::string& key)
   return false;
 }
 
-RedisKVClient::RedisConnection::RedisConnection(const ComboAddress& address)
+void validateRedisUrl(const YaHTTP::URL& parsed, const std::string& url)
 {
+  if (parsed.protocol.empty() || (parsed.protocol != "redis" && parsed.protocol != "rediss")) {
+    throw std::runtime_error("Invalid redis URL: " + url + " - Invalid protocol! Use redis or rediss.");
+  }
+  else if (parsed.host.empty()) {
+    throw std::runtime_error("Invalid redis URL: " + url + " - Host empty.");
+  }
+}
+
+RedisKVClient::RedisConnection::RedisConnection(const std::string& url)
+{
+  auto parsed = YaHTTP::URL();
+  if (!parsed.parse(url)) {
+    validateRedisUrl(parsed, url);
+    throw std::runtime_error("Invalid redis URL: " + url);
+  }
+
+  validateRedisUrl(parsed, url);
+
+  if (parsed.port == 0) {
+    parsed.port = 6379;
+  }
+
   // The `redisContext` type represents the connection
   // to the Redis server. Here, we connect to the
   // default host and port.
-  d_context = redisConnect(address.toString().c_str(), address.getPort());
+  d_context = redisConnect(parsed.host.c_str(), parsed.port);
 
   // Check if the context is null or if a specific
   // error occurred.
   if (d_context == nullptr || d_context->err) {
     if (d_context != nullptr) {
-      warnlog("Error: %s", d_context->errstr);
+      warnlog("Error connecting to redis: %s", d_context->errstr);
     }
     else {
       warnlog("Can't allocate redis context");
@@ -134,9 +153,12 @@ RedisKVClient::RedisConnection::~RedisConnection()
   }
 }
 
-void RedisKVClient::RedisConnection::reconnect()
+bool RedisKVClient::RedisConnection::reconnect()
 {
   if (d_context) {
-    redisReconnect(d_context);
+    int result = redisReconnect(d_context);
+    return result == REDIS_OK;
   }
+
+  return false;
 }

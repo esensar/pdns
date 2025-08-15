@@ -44,7 +44,7 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
 #endif /* HAVE_CDB */
 
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisKVStore", [client](const std::string& address, boost::optional<LuaAssociativeTable<string>> vars) {
+  luaCtx.writeFunction("newRedisKVStore", [client](const std::string& url, boost::optional<LuaAssociativeTable<string>> vars) {
     if (client) {
       return std::shared_ptr<KeyValueStore>(nullptr);
     }
@@ -56,13 +56,7 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     getOptionalValue<std::string>(vars, "lookupAction", lookupAction);
 
     checkAllParametersConsumed("newRedisKVStore", vars);
-    try {
-      redisAddress = ComboAddress(address);
-    }
-    catch (const PDNSException& e) {
-      throw std::runtime_error(std::string("Error parsing the address for the Redis KVStore: ") + e.reason);
-    }
-    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisAddress, lookupAction, dataName));
+    return std::shared_ptr<KeyValueStore>(new RedisKVStore(url, lookupAction, dataName));
   });
 #endif /* HAVE_REDIS */
 
