@@ -22,6 +22,7 @@
 #pragma once
 
 #include "iputils.hh"
+#include "yahttp/url.hpp"
 #include <hiredis/hiredis.h>
 #include <memory>
 #include <string>
@@ -217,8 +218,8 @@ private:
 class RedisKVClient
 {
 public:
-  RedisKVClient(const ComboAddress& address, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
-    d_connection(address), d_command(std::move(command))
+  RedisKVClient(const std::string& url, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
+    d_connection(url), d_command(std::move(command))
   {
   }
 
@@ -226,14 +227,12 @@ public:
   bool keyExists(const std::string& key);
 
 private:
-  void reconnect();
-
   class RedisConnection
   {
   public:
-    RedisConnection(const ComboAddress& address);
+    RedisConnection(const std::string& url);
     ~RedisConnection();
-    void reconnect();
+    bool reconnect();
     redisContext* getConnection()
     {
       return d_context;
@@ -241,6 +240,7 @@ private:
 
   private:
     redisContext* d_context;
+    YaHTTP::URL url;
   };
 
   RedisConnection d_connection;
