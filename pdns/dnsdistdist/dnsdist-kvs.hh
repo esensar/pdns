@@ -238,6 +238,6 @@ public:
   bool reload() override;
 
 private:
-  SharedLockGuarded<std::unique_ptr<RedisKVClient>> d_redis{nullptr};
+  std::unique_ptr<RedisKVClient> d_redis{nullptr};
 };
 #endif // HAVE_REDIS
