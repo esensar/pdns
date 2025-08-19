@@ -22,6 +22,8 @@
 #pragma once
 
 #include "iputils.hh"
+#include "lock.hh"
+#include "yahttp/yahttp.hpp"
 #include "yahttp/url.hpp"
 #include <hiredis/hiredis.h>
 #include <memory>
@@ -159,7 +161,7 @@ class RedisGetCommand : public RedisCommand
 {
 public:
   RedisGetCommand(const std::string& prefix = "") :
-    prefix(prefix)
+    d_prefix(prefix)
   {
   }
   ~RedisGetCommand() = default;
@@ -167,14 +169,14 @@ public:
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
-  std::string prefix;
+  std::string d_prefix;
 };
 
 class RedisHGetCommand : public RedisCommand
 {
 public:
   RedisHGetCommand(const std::string& hash_key) :
-    hash_key(hash_key)
+    d_hash_key(hash_key)
   {
   }
   ~RedisHGetCommand() = default;
@@ -182,14 +184,14 @@ public:
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
-  std::string hash_key;
+  std::string d_hash_key;
 };
 
 class RedisSismemberCommand : public RedisCommand
 {
 public:
   RedisSismemberCommand(const std::string& set_key) :
-    set_key(set_key)
+    d_set_key(set_key)
   {
   }
   ~RedisSismemberCommand() = default;
@@ -197,14 +199,14 @@ public:
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
-  std::string set_key;
+  std::string d_set_key;
 };
 
 class RedisSscanCommand : public RedisCommand
 {
 public:
   RedisSscanCommand(const std::string& set_key) :
-    set_key(set_key)
+    d_set_key(set_key)
   {
   }
   ~RedisSscanCommand() = default;
@@ -212,7 +214,7 @@ public:
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
-  std::string set_key;
+  std::string d_set_key;
 };
 
 class RedisKVClient
@@ -231,18 +233,22 @@ private:
   {
   public:
     RedisConnection(const std::string& url);
-    ~RedisConnection();
+    ~RedisConnection() = default;
     bool reconnect();
-    redisContext* getConnection()
+    LockGuardedHolder<const std::unique_ptr<redisContext, decltype(&redisFree)>> getConnection()
     {
-      return d_context;
+      return d_context.read_only_lock();
     }
 
   private:
-    redisContext* d_context;
-    YaHTTP::URL url;
+    LockGuarded<std::unique_ptr<redisContext, decltype(&redisFree)>> d_context{std::unique_ptr<redisContext, decltype(&redisFree)>(nullptr, redisFree)};
+    YaHTTP::URL d_url;
   };
+
+  using cache_t = std::unordered_map<std::string, std::string>;
 
   RedisConnection d_connection;
   std::unique_ptr<RedisCommand> d_command;
+  SharedLockGuarded<cache_t> d_result_cache;
+  SharedLockGuarded<cache_t> d_copy_cache;
 };

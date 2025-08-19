@@ -315,7 +315,7 @@ RedisKVStore::RedisKVStore(const std::string& url, boost::optional<std::string> 
       command = std::make_unique<RedisGetCommand>();
     }
   }
-  *(d_redis.write_lock()) = std::make_unique<RedisKVClient>(url, std::move(command));
+  d_redis = std::make_unique<RedisKVClient>(url, std::move(command));
 }
 
 RedisKVStore::~RedisKVStore()
@@ -329,12 +329,12 @@ bool RedisKVStore::reload()
 
 bool RedisKVStore::getValue(const std::string& key, std::string& value)
 {
-  return (*d_redis.read_lock())->getValue(key, value);
+  return d_redis->getValue(key, value);
 }
 
 bool RedisKVStore::keyExists(const std::string& key)
 {
-  return (*d_redis.read_lock())->keyExists(key);
+  return d_redis->keyExists(key);
 }
 
 #endif // HAVE_REDIS
