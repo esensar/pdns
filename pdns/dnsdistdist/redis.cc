@@ -25,7 +25,6 @@
 
 #include "redis.hh"
 #include "dolog.hh"
-#include "yahttp/yahttp.hpp"
 #include <hiredis/hiredis.h>
 
 #include <sys/types.h>
@@ -35,76 +34,98 @@
 
 std::unique_ptr<RedisReply<std::string>> RedisGetCommand::getValue(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "GET %s%s", prefix.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "GET %s%s", d_prefix.c_str(), key.c_str()));
   return std::make_unique<RedisStringReply>(reply);
 }
 
 std::unique_ptr<RedisReply<bool>> RedisGetCommand::keyExists(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "EXISTS %s%s", prefix.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "EXISTS %s%s", d_prefix.c_str(), key.c_str()));
   return std::make_unique<RedisIntReply>(reply);
 }
 
 std::unique_ptr<RedisReply<std::string>> RedisHGetCommand::getValue(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HGET %s %s", hash_key.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HGET %s %s", d_hash_key.c_str(), key.c_str()));
   return std::make_unique<RedisStringReply>(reply);
 }
 
 std::unique_ptr<RedisReply<bool>> RedisHGetCommand::keyExists(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HEXISTS %s %s", hash_key.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HEXISTS %s %s", d_hash_key.c_str(), key.c_str()));
   return std::make_unique<RedisIntReply>(reply);
 }
 
 std::unique_ptr<RedisReply<std::string>> RedisSismemberCommand::getValue(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SISMEMBER %s %s", set_key.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SISMEMBER %s %s", d_set_key.c_str(), key.c_str()));
   return std::make_unique<RedisIntAsStringReply>(reply);
 }
 
 std::unique_ptr<RedisReply<bool>> RedisSismemberCommand::keyExists(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SISMEMBER %s %s", set_key.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SISMEMBER %s %s", d_set_key.c_str(), key.c_str()));
   return std::make_unique<RedisIntReply>(reply);
 }
 
 std::unique_ptr<RedisReply<std::string>> RedisSscanCommand::getValue(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %s 0 %s", set_key.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %s 0 %s", d_set_key.c_str(), key.c_str()));
   return std::make_unique<RedisScanAsStringReply>(reply);
 }
 
 std::unique_ptr<RedisReply<bool>> RedisSscanCommand::keyExists(redisContext* context, const std::string& key)
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %s 0 %s", set_key.c_str(), key.c_str()));
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %s 0 %s", d_set_key.c_str(), key.c_str()));
   return std::make_unique<RedisScanAsBoolReply>(reply);
 }
 
 bool RedisKVClient::getValue(const std::string& key, std::string& value)
 {
-  auto reply = d_command->getValue(d_connection.getConnection(), key);
+  {
+    auto cache = d_result_cache.read_lock();
+    auto entry = cache->find(key);
+    if (entry != cache->end()) {
+      value = entry->second;
+      vinfolog("Got value %s for key '%s' from cache", value, key);
+      return true;
+    }
+  }
+
+  auto reply = d_command->getValue(d_connection.getConnection()->get(), key);
   if (reply->ok()) {
     value = reply->getValue();
+    auto cache = d_result_cache.write_lock();
+    cache->emplace(key, value);
     vinfolog("Got value %s for key '%s'", value, key);
     return true;
   }
 
-  vinfolog("Error while looking up key '%s' from Redis: %s", key, (d_connection.getConnection())->errstr);
+  vinfolog("Error while looking up key '%s' from Redis: %s", key, (d_connection.getConnection()->get())->errstr);
   return false;
 }
 
 bool RedisKVClient::keyExists(const std::string& key)
 {
-  auto reply = d_command->keyExists(d_connection.getConnection(), key);
+  {
+    auto cache = d_result_cache.read_lock();
+    if (cache->find(key) != cache->end()) {
+      return true;
+    }
+  }
+
+  auto connection = d_connection.getConnection();
+  auto reply = d_command->keyExists(connection->get(), key);
   if (reply->ok()) {
     return reply->getValue();
   }
 
-  vinfolog("Error while looking up key '%s' from Redis: %s", key, (d_connection.getConnection())->errstr);
+  vinfolog("Error while looking up key '%s' from Redis: %s", key, (connection->get())->errstr);
   return false;
 }
 
+namespace
+{
 void validateRedisUrl(const YaHTTP::URL& parsed, const std::string& url)
 {
   if (parsed.protocol.empty() || (parsed.protocol != "redis" && parsed.protocol != "rediss")) {
@@ -114,31 +135,31 @@ void validateRedisUrl(const YaHTTP::URL& parsed, const std::string& url)
     throw std::runtime_error("Invalid redis URL: " + url + " - Host empty.");
   }
 }
+}
 
 RedisKVClient::RedisConnection::RedisConnection(const std::string& url)
 {
   auto parsed = YaHTTP::URL();
   if (!parsed.parse(url)) {
     validateRedisUrl(parsed, url);
-    throw std::runtime_error("Invalid redis URL: " + url);
+    // throw std::runtime_error("Invalid redis URL: " + url);
   }
 
   validateRedisUrl(parsed, url);
+  d_url = parsed;
 
   if (parsed.port == 0) {
     parsed.port = 6379;
   }
 
-  // The `redisContext` type represents the connection
-  // to the Redis server. Here, we connect to the
-  // default host and port.
-  d_context = redisConnect(parsed.host.c_str(), parsed.port);
+  *(d_context.lock()) = std::unique_ptr<redisContext, decltype(&redisFree)>(redisConnect(parsed.host.c_str(), parsed.port), redisFree);
 
+  auto context = d_context.read_only_lock();
   // Check if the context is null or if a specific
   // error occurred.
-  if (d_context == nullptr || d_context->err) {
-    if (d_context != nullptr) {
-      warnlog("Error connecting to redis: %s", d_context->errstr);
+  if (context->get() == nullptr || context->get()->err) {
+    if (context->get() != nullptr) {
+      warnlog("Error connecting to redis: %s", context->get()->errstr);
     }
     else {
       warnlog("Can't allocate redis context");
@@ -146,17 +167,11 @@ RedisKVClient::RedisConnection::RedisConnection(const std::string& url)
   }
 }
 
-RedisKVClient::RedisConnection::~RedisConnection()
-{
-  if (d_context) {
-    redisFree(d_context);
-  }
-}
-
 bool RedisKVClient::RedisConnection::reconnect()
 {
-  if (d_context) {
-    int result = redisReconnect(d_context);
+  auto context = d_context.read_only_lock();
+  if (context->get() != nullptr) {
+    int result = redisReconnect(context->get());
     return result == REDIS_OK;
   }
 
