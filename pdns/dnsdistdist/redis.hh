@@ -201,7 +201,7 @@ class RedisCommand
 {
 public:
   virtual ~RedisCommand() = default;
-  virtual bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) = 0;
+  virtual bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) = 0;
   virtual std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) = 0;
   virtual cache_t generateCopyCache(redisContext* context) = 0;
   virtual std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) = 0;
@@ -215,7 +215,7 @@ public:
   {
   }
   ~RedisGetCommand() = default;
-  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
+  bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
   cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
@@ -232,7 +232,7 @@ public:
   {
   }
   ~RedisHGetCommand() = default;
-  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
+  bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
   cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
@@ -249,7 +249,7 @@ public:
   {
   }
   ~RedisSismemberCommand() = default;
-  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
+  bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
   cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
@@ -266,7 +266,7 @@ public:
   {
   }
   ~RedisSscanCommand() = default;
-  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
+  bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
   cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
