@@ -315,7 +315,7 @@ RedisKVStore::RedisKVStore(const std::string& url, boost::optional<std::string> 
       command = std::make_unique<RedisGetCommand>();
     }
   }
-  d_redis = std::make_unique<RedisKVClient>(url, std::move(command));
+  d_redis = std::make_unique<RedisKVClient>(std::make_unique<RedisClient>(url), std::move(command));
 }
 
 RedisKVStore::~RedisKVStore()
