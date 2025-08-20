@@ -29,6 +29,8 @@
 #include <memory>
 #include <string>
 
+using cache_t = std::unordered_map<std::string, std::string>;
+
 template <typename T>
 class RedisReply
 {
@@ -69,7 +71,7 @@ public:
   }
   std::string getValue() override
   {
-    return std::string(d_reply->str);
+    return std::string(d_reply->str, d_reply->len);
   }
 };
 
@@ -149,11 +151,59 @@ public:
   }
 };
 
+class RedisHashReply : public RedisReply<std::unordered_map<std::string, std::string>>
+{
+public:
+  RedisHashReply(redisReply* reply) :
+    RedisReply(reply)
+  {
+  }
+  ~RedisHashReply() = default;
+  bool ok() override
+  {
+    return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements % 2 == 0;
+  }
+  std::unordered_map<std::string, std::string> getValue() override
+  {
+    std::unordered_map<std::string, std::string> result{d_reply->elements / 2};
+    for (size_t i = 0; i < d_reply->elements; i += 2) {
+      auto key = std::string(d_reply->element[i]->str, d_reply->element[i]->len);
+      auto value = std::string(d_reply->element[i + 1]->str, d_reply->element[i + 1]->len);
+      result.emplace(key, value);
+    }
+    return result;
+  }
+};
+
+class RedisSetReply : public RedisReply<std::unordered_set<std::string>>
+{
+public:
+  RedisSetReply(redisReply* reply) :
+    RedisReply(reply)
+  {
+  }
+  ~RedisSetReply() = default;
+  bool ok() override
+  {
+    return d_reply && d_reply->type == REDIS_REPLY_ARRAY;
+  }
+  std::unordered_set<std::string> getValue() override
+  {
+    std::unordered_set<std::string> result{d_reply->elements};
+    for (size_t i = 0; i < d_reply->elements; i++) {
+      result.emplace(d_reply->element[i]->str);
+    }
+    return result;
+  }
+};
+
 class RedisCommand
 {
 public:
   virtual ~RedisCommand() = default;
+  virtual bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) = 0;
   virtual std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) = 0;
+  virtual cache_t generateCopyCache(redisContext* context) = 0;
   virtual std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) = 0;
 };
 
@@ -165,7 +215,9 @@ public:
   {
   }
   ~RedisGetCommand() = default;
+  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
@@ -180,7 +232,9 @@ public:
   {
   }
   ~RedisHGetCommand() = default;
+  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
@@ -195,7 +249,9 @@ public:
   {
   }
   ~RedisSismemberCommand() = default;
+  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
@@ -210,7 +266,9 @@ public:
   {
   }
   ~RedisSscanCommand() = default;
+  bool getFromCopyCache(cache_t& cache, const std::string& key, std::string& value) override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) override;
+  cache_t generateCopyCache(redisContext* context) override;
   std::unique_ptr<RedisReply<bool>> keyExists(redisContext* context, const std::string& key) override;
 
 private:
@@ -245,10 +303,8 @@ private:
     YaHTTP::URL d_url;
   };
 
-  using cache_t = std::unordered_map<std::string, std::string>;
-
   RedisConnection d_connection;
   std::unique_ptr<RedisCommand> d_command;
-  SharedLockGuarded<cache_t> d_result_cache;
-  SharedLockGuarded<cache_t> d_copy_cache;
+  SharedLockGuarded<cache_t> d_resultCache;
+  SharedLockGuarded<cache_t> d_copyCache;
 };
