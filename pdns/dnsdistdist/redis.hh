@@ -307,7 +307,7 @@ private:
 class ResultCachingRedisClient : public RedisClientInterface
 {
 public:
-  ResultCachingRedisClient(std::unique_ptr<RedisClientInterface>&& client) :
+  ResultCachingRedisClient(std::unique_ptr<RedisClientInterface> client) :
     d_client(std::move(client))
   {
   }
@@ -324,7 +324,7 @@ private:
 class CopyCachingRedisClient : public RedisClientInterface
 {
 public:
-  CopyCachingRedisClient(std::unique_ptr<RedisClientInterface>&& client) :
+  CopyCachingRedisClient(std::unique_ptr<RedisClientInterface> client) :
     d_client(std::move(client))
   {
   }
@@ -341,7 +341,7 @@ private:
 class RedisKVClient
 {
 public:
-  RedisKVClient(const std::shared_ptr<RedisClientInterface>& client, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
+  RedisKVClient(const std::shared_ptr<RedisClientInterface>& client, std::unique_ptr<RedisCommand> command = std::make_unique<RedisGetCommand>()) :
     d_client(client), d_command(std::move(command))
   {
   }

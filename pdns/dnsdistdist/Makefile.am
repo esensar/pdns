@@ -215,6 +215,7 @@ dnsdist_SOURCES = \
 	dnsdist-lua-bindings-dnsparser.cc \
 	dnsdist-lua-bindings-dnsquestion.cc \
 	dnsdist-lua-bindings-kvs.cc \
+	dnsdist-lua-bindings-redis.cc \
 	dnsdist-lua-bindings-network.cc \
 	dnsdist-lua-bindings-packetcache.cc \
 	dnsdist-lua-bindings-protobuf.cc \

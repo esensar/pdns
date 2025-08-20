@@ -21,6 +21,7 @@
  */
 #include "dnsdist.hh"
 #include "dnsdist-lua.hh"
+#include <memory>
 #ifdef HAVE_REDIS
 #include "redis.hh"
 #endif /* HAVE_REDIS */
@@ -28,18 +29,30 @@
 void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] bool client)
 {
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, boost::optional<LuaAssociativeTable<string>> vars) {
+  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, boost::optional<LuaAssociativeTable<bool>> vars) {
     if (client) {
       return std::shared_ptr<RedisClientInterface>(nullptr);
     }
 
-    boost::optional<std::string> lookupAction;
-    boost::optional<std::string> dataName;
-    getOptionalValue<std::string>(vars, "dataName", dataName);
-    getOptionalValue<std::string>(vars, "lookupAction", lookupAction);
+    bool copyCacheEnabled{false};
+    bool resultCacheEnabled{false};
+    getOptionalValue<bool>(vars, "copyCacheEnabled", copyCacheEnabled);
+    getOptionalValue<bool>(vars, "resultCacheEnabled", resultCacheEnabled);
 
     checkAllParametersConsumed("newRedisClient", vars);
-    return std::shared_ptr<RedisClientInterface>(new RedisClient(url));
+    if (copyCacheEnabled || resultCacheEnabled) {
+      std::unique_ptr<RedisClientInterface> redis = std::make_unique<RedisClient>(url);
+      if (resultCacheEnabled) {
+        redis = std::make_unique<ResultCachingRedisClient>(std::move(redis));
+      }
+      if (copyCacheEnabled) {
+        redis = std::make_unique<CopyCachingRedisClient>(std::move(redis));
+      }
+      return std::shared_ptr<RedisClientInterface>(std::move(redis));
+    }
+    else {
+      return std::shared_ptr<RedisClientInterface>(new RedisClient(url));
+    }
   });
 #endif /* HAVE_REDIS */
 
