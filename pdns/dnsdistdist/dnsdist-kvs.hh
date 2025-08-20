@@ -230,8 +230,7 @@ private:
 class RedisKVStore : public KeyValueStore
 {
 public:
-  RedisKVStore(const std::string& url, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName);
-  ~RedisKVStore();
+  RedisKVStore(const std::shared_ptr<RedisClientInterface>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName);
 
   bool keyExists(const std::string& key) override;
   bool getValue(const std::string& key, std::string& value) override;
