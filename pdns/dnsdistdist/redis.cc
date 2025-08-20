@@ -49,7 +49,7 @@ cache_t RedisGetCommand::generateCopyCache([[maybe_unused]] redisContext* contex
   return {};
 }
 
-bool RedisGetCommand::getFromCopyCache([[maybe_unused]] cache_t& cache, [[maybe_unused]] const std::string& key, [[maybe_unused]] std::string& value)
+bool RedisGetCommand::getFromCopyCache([[maybe_unused]] const cache_t& cache, [[maybe_unused]] const std::string& key, [[maybe_unused]] std::string& value)
 {
   return false;
 }
@@ -72,7 +72,7 @@ cache_t RedisHGetCommand::generateCopyCache(redisContext* context)
   return RedisHashReply(reply).getValue();
 }
 
-bool RedisHGetCommand::getFromCopyCache(cache_t& cache, const std::string& key, std::string& value)
+bool RedisHGetCommand::getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value)
 {
   auto val = cache.find(key);
   if (val != cache.end()) {
@@ -105,7 +105,7 @@ cache_t RedisSismemberCommand::generateCopyCache(redisContext* context)
   return result;
 }
 
-bool RedisSismemberCommand::getFromCopyCache(cache_t& cache, const std::string& key, std::string& value)
+bool RedisSismemberCommand::getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value)
 {
   auto val = cache.find(key);
   if (val != cache.end()) {
@@ -138,7 +138,7 @@ cache_t RedisSscanCommand::generateCopyCache(redisContext* context)
   return result;
 }
 
-bool RedisSscanCommand::getFromCopyCache(cache_t& cache, const std::string& key, std::string& value)
+bool RedisSscanCommand::getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value)
 {
   auto val = cache.find(key);
   if (val != cache.end()) {
@@ -152,9 +152,8 @@ bool RedisKVClient::getValue(const std::string& key, std::string& value)
 {
   {
     auto cache = d_copyCache.read_lock();
-    auto entry = cache->find(key);
-    if (entry != cache->end()) {
-      value = entry->second;
+    auto found = d_command->getFromCopyCache(*cache, key, value);
+    if (found) {
       return true;
     }
   }
@@ -236,7 +235,6 @@ RedisKVClient::RedisConnection::RedisConnection(const std::string& url)
   auto parsed = YaHTTP::URL();
   if (!parsed.parse(url)) {
     validateRedisUrl(parsed, url);
-    // throw std::runtime_error("Invalid redis URL: " + url);
   }
 
   validateRedisUrl(parsed, url);
@@ -245,20 +243,19 @@ RedisKVClient::RedisConnection::RedisConnection(const std::string& url)
   if (parsed.port == 0) {
     parsed.port = 6379;
   }
-
-  *(d_context.lock()) = std::unique_ptr<redisContext, decltype(&redisFree)>(redisConnect(parsed.host.c_str(), parsed.port), redisFree);
-
-  auto context = d_context.read_only_lock();
+  auto context = std::unique_ptr<redisContext, decltype(&redisFree)>(redisConnect(parsed.host.c_str(), parsed.port), redisFree);
   // Check if the context is null or if a specific
   // error occurred.
-  if (context->get() == nullptr || context->get()->err) {
-    if (context->get() != nullptr) {
-      warnlog("Error connecting to redis: %s", context->get()->errstr);
+  if (context == nullptr || context->err) {
+    if (context != nullptr) {
+      warnlog("Error connecting to redis: %s", context->errstr);
     }
     else {
       warnlog("Can't allocate redis context");
     }
   }
+
+  *(d_context.lock()) = std::move(context);
 }
 
 bool RedisKVClient::RedisConnection::reconnect()
