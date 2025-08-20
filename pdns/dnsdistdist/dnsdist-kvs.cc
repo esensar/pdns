@@ -287,7 +287,7 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::string& url, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName)
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClientInterface>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName)
 {
   std::unique_ptr<RedisCommand> command;
   if (lookupAction && !boost::iequals(lookupAction.get(), "get")) {
@@ -315,11 +315,7 @@ RedisKVStore::RedisKVStore(const std::string& url, boost::optional<std::string> 
       command = std::make_unique<RedisGetCommand>();
     }
   }
-  d_redis = std::make_unique<RedisKVClient>(std::make_unique<RedisClient>(url), std::move(command));
-}
-
-RedisKVStore::~RedisKVStore()
-{
+  d_redis = std::make_unique<RedisKVClient>(redisClient, std::move(command));
 }
 
 bool RedisKVStore::reload()

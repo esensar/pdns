@@ -64,7 +64,6 @@ public:
     RedisReply(reply)
   {
   }
-  ~RedisStringReply() = default;
   bool ok() const override
   {
     return d_reply && (d_reply->str);
@@ -82,7 +81,6 @@ public:
     RedisReply(reply)
   {
   }
-  ~RedisIntAsStringReply() = default;
   bool ok() const override
   {
     return d_reply && d_reply->type == REDIS_REPLY_INTEGER;
@@ -100,7 +98,6 @@ public:
     RedisReply(reply)
   {
   }
-  ~RedisIntReply() = default;
   bool getValue() const override
   {
     return d_reply->integer > 0;
@@ -114,7 +111,6 @@ public:
     RedisReply(reply)
   {
   }
-  ~RedisScanAsStringReply() = default;
   bool ok() const override
   {
     return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements == 2;
@@ -140,7 +136,6 @@ public:
     RedisReply(reply)
   {
   }
-  ~RedisScanAsBoolReply() = default;
   bool ok() const override
   {
     return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements == 2 && d_reply->element[0]->type == REDIS_REPLY_BIGNUM;
@@ -158,7 +153,6 @@ public:
     RedisReply(reply)
   {
   }
-  ~RedisHashReply() = default;
   bool ok() const override
   {
     return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements % 2 == 0;
@@ -182,7 +176,6 @@ public:
     RedisReply(reply)
   {
   }
-  ~RedisSetReply() = default;
   bool ok() const override
   {
     return d_reply && d_reply->type == REDIS_REPLY_ARRAY;
@@ -214,7 +207,6 @@ public:
     d_prefix(prefix)
   {
   }
-  ~RedisGetCommand() = default;
   bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) const override;
   cache_t generateCopyCache(redisContext* context) const override;
@@ -231,7 +223,6 @@ public:
     d_hash_key(hash_key)
   {
   }
-  ~RedisHGetCommand() = default;
   bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) const override;
   cache_t generateCopyCache(redisContext* context) const override;
@@ -248,7 +239,6 @@ public:
     d_set_key(set_key)
   {
   }
-  ~RedisSismemberCommand() = default;
   bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) const override;
   cache_t generateCopyCache(redisContext* context) const override;
@@ -265,7 +255,6 @@ public:
     d_set_key(set_key)
   {
   }
-  ~RedisSscanCommand() = default;
   bool getFromCopyCache(const cache_t& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReply<std::string>> getValue(redisContext* context, const std::string& key) const override;
   cache_t generateCopyCache(redisContext* context) const override;
@@ -301,7 +290,6 @@ private:
   {
   public:
     RedisConnection(const std::string& url);
-    ~RedisConnection() = default;
     bool reconnect();
     LockGuardedHolder<const std::unique_ptr<redisContext, decltype(&redisFree)>> getConnection()
     {
@@ -353,8 +341,8 @@ private:
 class RedisKVClient
 {
 public:
-  RedisKVClient(std::unique_ptr<RedisClientInterface>&& client, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
-    d_client(std::move(client)), d_command(std::move(command))
+  RedisKVClient(const std::shared_ptr<RedisClientInterface>& client, std::unique_ptr<RedisCommand>&& command = std::make_unique<RedisGetCommand>()) :
+    d_client(client), d_command(std::move(command))
   {
   }
 
@@ -362,6 +350,6 @@ public:
   bool keyExists(const std::string& key);
 
 private:
-  std::unique_ptr<RedisClientInterface> d_client;
+  std::shared_ptr<RedisClientInterface> d_client;
   std::unique_ptr<RedisCommand> d_command;
 };
