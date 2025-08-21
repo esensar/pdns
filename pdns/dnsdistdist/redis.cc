@@ -80,6 +80,12 @@ std::unique_ptr<RedisReplyInterface<bool>> RedisSScanCommand::operator()(redisCo
   return std::make_unique<RedisScanAsBoolReply>(reply);
 }
 
+std::unique_ptr<RedisReplyInterface<std::unordered_set<std::string>>> RedisZrangeBylexCommand::operator()(redisContext* context, const std::string& set_key, const size_t& start, const size_t& stop) const
+{
+  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "ZRANGE %b %d %d BYLEX", set_key.data(), set_key.length(), start, stop));
+  return std::make_unique<RedisSetReply>(reply);
+}
+
 std::unique_ptr<RedisReplyInterface<std::string>> RedisGetLookupAction::getValue(redisContext* context, const std::string& key) const
 {
   return d_getCommand(context, d_prefix + key);
