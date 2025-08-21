@@ -467,6 +467,7 @@ testrunner_LDFLAGS = \
 testrunner_LDADD = \
 	$(BOOST_UNIT_TEST_FRAMEWORK_LIBS) \
 	$(FSTRM_LIBS) \
+	$(YAHTTP_LIBS) \
 	$(LIBSODIUM_LIBS) \
 	$(LUA_LIBS) \
 	$(RT_LIBS) \
