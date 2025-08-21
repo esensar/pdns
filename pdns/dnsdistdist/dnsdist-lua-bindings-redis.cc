@@ -29,102 +29,139 @@
 void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] bool client)
 {
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, boost::optional<LuaAssociativeTable<bool>> vars) {
+  luaCtx.writeFunction("newRedisClient", [client](const std::string& url) {
     if (client) {
-      return std::shared_ptr<RedisClientInterface>(nullptr);
+      return std::shared_ptr<RedisClient>(nullptr);
     }
 
-    bool copyCacheEnabled{false};
-    bool resultCacheEnabled{false};
-    getOptionalValue<bool>(vars, "copyCacheEnabled", copyCacheEnabled);
-    getOptionalValue<bool>(vars, "resultCacheEnabled", resultCacheEnabled);
+    return std::make_shared<RedisClient>(url);
+  });
 
-    checkAllParametersConsumed("newRedisClient", vars);
-    if (copyCacheEnabled || resultCacheEnabled) {
-      std::unique_ptr<RedisClientInterface> redis = std::make_unique<RedisClient>(url);
-      if (resultCacheEnabled) {
-        redis = std::make_unique<ResultCachingRedisClient>(std::move(redis));
-      }
-      if (copyCacheEnabled) {
-        redis = std::make_unique<CopyCachingRedisClient>(std::move(redis));
-      }
-      return std::shared_ptr<RedisClientInterface>(std::move(redis));
+  luaCtx.registerFunction<std::string (std::shared_ptr<RedisClient>::*)(const std::string&)>("get", [](std::shared_ptr<RedisClient>& kvs, const std::string& key) {
+    std::string result;
+    if (!kvs) {
+      return result;
     }
-    else {
-      return std::shared_ptr<RedisClientInterface>(new RedisClient(url));
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisGetCommand{}(connection->get(), key);
+
+    if (reply->ok()) {
+      result = reply->getValue();
     }
+
+    return result;
+  });
+
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&)>("exists", [](std::shared_ptr<RedisClient>& kvs, const std::string& key) {
+    if (!kvs) {
+      return false;
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisExistsCommand{}(connection->get(), key);
+
+    if (reply->ok()) {
+      return reply->getValue();
+    }
+
+    return false;
+  });
+
+  luaCtx.registerFunction<std::string (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("hget", [](std::shared_ptr<RedisClient>& kvs, const std::string& hash_key, const std::string& key) {
+    std::string result;
+    if (!kvs) {
+      return result;
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisHGetCommand{}(connection->get(), hash_key, key);
+
+    if (reply->ok()) {
+      result = reply->getValue();
+    }
+
+    return result;
+  });
+
+  luaCtx.registerFunction<LuaAssociativeTable<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("hgetall", [](std::shared_ptr<RedisClient>& kvs, const std::string& hash_key) {
+    if (!kvs) {
+      return LuaAssociativeTable<std::string>();
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisHGetAllCommand{}(connection->get(), hash_key);
+
+    if (reply->ok()) {
+      return reply->getValue();
+    }
+
+    return LuaAssociativeTable<std::string>();
+  });
+
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("hexists", [](std::shared_ptr<RedisClient>& kvs, const std::string& hash_key, const std::string& key) {
+    if (!kvs) {
+      return false;
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisHExistsCommand{}(connection->get(), hash_key, key);
+
+    if (reply->ok()) {
+      return reply->getValue();
+    }
+
+    return false;
+  });
+
+  luaCtx.registerFunction<LuaArray<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("smembers", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key) {
+    if (!kvs) {
+      return LuaArray<std::string>();
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisSMembersCommand{}(connection->get(), set_key);
+
+    if (reply->ok()) {
+      auto members = reply->getValue();
+      LuaArray<std::string> result{members.size()};
+      for (const auto& member : members) {
+        result.emplace_back(result.size() + 1, member);
+      }
+      return result;
+    }
+
+    return LuaArray<std::string>();
+  });
+
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("sismember", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key, const std::string& key) {
+    if (!kvs) {
+      return false;
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisSIsMemberCommand{}(connection->get(), set_key, key);
+
+    if (reply->ok()) {
+      return reply->getValue();
+    }
+
+    return false;
+  });
+
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const int&, const std::string&, const int&)>("sscan", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key, const int& cursor, const std::string& key, const int& count) {
+    if (!kvs) {
+      return false;
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisSScanCommand{}(connection->get(), set_key, cursor, key, count);
+
+    if (reply->ok()) {
+      return reply->getValue();
+    }
+
+    return false;
   });
 #endif /* HAVE_REDIS */
-
-  // #if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
-  //   /* Key Value Store objects */
-  //   luaCtx.writeFunction("KeyValueLookupKeySourceIP", [](boost::optional<uint8_t> v4Mask, boost::optional<uint8_t> v6Mask, boost::optional<bool> includePort) {
-  //     return std::shared_ptr<KeyValueLookupKey>(new KeyValueLookupKeySourceIP(v4Mask ? *v4Mask : 32, v6Mask ? *v6Mask : 128, includePort ? *includePort : false));
-  //   });
-  //   luaCtx.writeFunction("KeyValueLookupKeyQName", [](boost::optional<bool> wireFormat) {
-  //     return std::shared_ptr<KeyValueLookupKey>(new KeyValueLookupKeyQName(wireFormat ? *wireFormat : true));
-  //   });
-  //   luaCtx.writeFunction("KeyValueLookupKeySuffix", [](boost::optional<size_t> minLabels, boost::optional<bool> wireFormat) {
-  //     return std::shared_ptr<KeyValueLookupKey>(new KeyValueLookupKeySuffix(minLabels ? *minLabels : 0, wireFormat ? *wireFormat : true));
-  //   });
-  //   luaCtx.writeFunction("KeyValueLookupKeyTag", [](const std::string& tag) {
-  //     return std::shared_ptr<KeyValueLookupKey>(new KeyValueLookupKeyTag(tag));
-  //   });
-  //
-  //   luaCtx.registerFunction<std::string (std::shared_ptr<KeyValueStore>::*)(const boost::variant<ComboAddress, DNSName, std::string>, boost::optional<bool> wireFormat)>("lookup", [](std::shared_ptr<KeyValueStore>& kvs, const boost::variant<ComboAddress, DNSName, std::string> keyVar, boost::optional<bool> wireFormat) {
-  //     std::string result;
-  //     if (!kvs) {
-  //       return result;
-  //     }
-  //
-  //     if (keyVar.type() == typeid(ComboAddress)) {
-  //       const auto ca = boost::get<ComboAddress>(&keyVar);
-  //       KeyValueLookupKeySourceIP lookup(32, 128, false);
-  //       for (const auto& key : lookup.getKeys(*ca)) {
-  //         if (kvs->getValue(key, result)) {
-  //           return result;
-  //         }
-  //       }
-  //     }
-  //     else if (keyVar.type() == typeid(DNSName)) {
-  //       const DNSName* dn = boost::get<DNSName>(&keyVar);
-  //       KeyValueLookupKeyQName lookup(wireFormat ? *wireFormat : true);
-  //       for (const auto& key : lookup.getKeys(*dn)) {
-  //         if (kvs->getValue(key, result)) {
-  //           return result;
-  //         }
-  //       }
-  //     }
-  //     else if (keyVar.type() == typeid(std::string)) {
-  //       const std::string* keyStr = boost::get<std::string>(&keyVar);
-  //       kvs->getValue(*keyStr, result);
-  //     }
-  //
-  //     return result;
-  //   });
-  //
-  //   luaCtx.registerFunction<std::string (std::shared_ptr<KeyValueStore>::*)(const DNSName&, boost::optional<size_t> minLabels, boost::optional<bool> wireFormat)>("lookupSuffix", [](std::shared_ptr<KeyValueStore>& kvs, const DNSName& dn, boost::optional<size_t> minLabels, boost::optional<bool> wireFormat) {
-  //     std::string result;
-  //     if (!kvs) {
-  //       return result;
-  //     }
-  //
-  //     KeyValueLookupKeySuffix lookup(minLabels ? *minLabels : 0, wireFormat ? *wireFormat : true);
-  //     for (const auto& key : lookup.getKeys(dn)) {
-  //       if (kvs->getValue(key, result)) {
-  //         return result;
-  //       }
-  //     }
-  //
-  //     return result;
-  //   });
-  //
-  //   luaCtx.registerFunction<bool (std::shared_ptr<KeyValueStore>::*)()>("reload", [](std::shared_ptr<KeyValueStore>& kvs) {
-  //     if (!kvs) {
-  //       return false;
-  //     }
-  //
-  //     return kvs->reload();
-  //   });
-  // #endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 }
