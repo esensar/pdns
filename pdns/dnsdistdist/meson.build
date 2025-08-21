@@ -154,6 +154,7 @@ common_sources += files(
   src_dir / 'dnsdist-lua-bindings-dnsparser.cc',
   src_dir / 'dnsdist-lua-bindings-dnsquestion.cc',
   src_dir / 'dnsdist-lua-bindings-kvs.cc',
+  src_dir / 'dnsdist-lua-bindings-redis.cc',
   src_dir / 'dnsdist-lua-bindings-network.cc',
   src_dir / 'dnsdist-lua-bindings-packetcache.cc',
   src_dir / 'dnsdist-lua-bindings-protobuf.cc',
