@@ -163,5 +163,25 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
 
     return false;
   });
+
+  luaCtx.registerFunction<LuaArray<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&, const int&, const int&)>("zrangebylex", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key, const int& start, const int& stop) {
+    if (!kvs) {
+      return LuaArray<std::string>();
+    }
+
+    auto connection = kvs->getConnection();
+    auto reply = RedisZrangeBylexCommand{}(connection->get(), set_key, start, stop);
+
+    if (reply->ok()) {
+      auto members = reply->getValue();
+      LuaArray<std::string> result{members.size()};
+      for (const auto& member : members) {
+        result.emplace_back(result.size() + 1, member);
+      }
+      return result;
+    }
+
+    return LuaArray<std::string>();
+  });
 #endif /* HAVE_REDIS */
 }

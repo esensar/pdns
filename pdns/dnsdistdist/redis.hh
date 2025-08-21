@@ -289,6 +289,11 @@ struct RedisSScanCommand : public RedisCommand<bool, std::string, size_t, std::s
   std::unique_ptr<RedisReplyInterface<bool>> operator()(redisContext* context, const std::string& set_key, const size_t& cursor, const std::string& key, const size_t& count) const override;
 };
 
+struct RedisZrangeBylexCommand : public RedisCommand<std::unordered_set<std::string>, std::string, size_t, size_t>
+{
+  std::unique_ptr<RedisReplyInterface<std::unordered_set<std::string>>> operator()(redisContext* context, const std::string& set_key, const size_t& start, const size_t& stop) const override;
+};
+
 class RedisLookupAction
 {
 public:
