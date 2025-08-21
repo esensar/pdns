@@ -577,6 +577,7 @@ if get_option('unit-tests')
           dep_ipcrypt2,
           dep_lua,
           dep_protozero,
+          dep_yahttp,
       ],
     )
   )
@@ -597,6 +598,7 @@ if get_option('unit-tests')
           dep_ffi_interface,
           dep_lua,
           dep_protozero,
+          dep_yahttp,
         ],
     }
   }
