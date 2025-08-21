@@ -287,21 +287,21 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClientInterface>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName)
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName, bool copyCacheEnabled, bool resultCacheEnabled)
 {
-  std::unique_ptr<RedisCommand> command;
+  std::unique_ptr<RedisLookupAction> command;
   if (lookupAction && !boost::iequals(lookupAction.get(), "get")) {
     if (!dataName) {
       throw std::runtime_error("Option 'dataName' is required for lookup action " + lookupAction.get());
     }
     if (boost::iequals(lookupAction.get(), "hget")) {
-      command = std::make_unique<RedisHGetCommand>(dataName.get());
+      command = std::make_unique<RedisHGetLookupAction>(dataName.get());
     }
     else if (boost::iequals(lookupAction.get(), "sismember")) {
-      command = std::make_unique<RedisSismemberCommand>(dataName.get());
+      command = std::make_unique<RedisSismemberLookupAction>(dataName.get());
     }
     else if (boost::iequals(lookupAction.get(), "sscan")) {
-      command = std::make_unique<RedisSscanCommand>(dataName.get());
+      command = std::make_unique<RedisSscanLookupAction>(dataName.get());
     }
     else {
       throw std::runtime_error("Unknown lookup action: " + lookupAction.get());
@@ -309,13 +309,19 @@ RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClientInterface>& redisCli
   }
   else {
     if (dataName) {
-      command = std::make_unique<RedisGetCommand>(dataName.get());
+      command = std::make_unique<RedisGetLookupAction>(dataName.get());
     }
     else {
-      command = std::make_unique<RedisGetCommand>();
+      command = std::make_unique<RedisGetLookupAction>();
     }
   }
   d_redis = std::make_unique<RedisKVClient>(redisClient, std::move(command));
+  if (resultCacheEnabled) {
+    d_redis = std::make_unique<ResultCachingRedisClient>(std::move(d_redis));
+  }
+  if (copyCacheEnabled) {
+    d_redis = std::make_unique<CopyCachingRedisClient>(std::move(d_redis));
+  }
 }
 
 bool RedisKVStore::reload()
