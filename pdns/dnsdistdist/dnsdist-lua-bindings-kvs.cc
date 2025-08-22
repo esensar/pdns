@@ -44,22 +44,22 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
 #endif /* HAVE_CDB */
 
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisKVStore", [client](const std::shared_ptr<RedisClient>& redisClient, boost::optional<LuaAssociativeTable<boost::variant<string, bool>>> vars) {
+  luaCtx.writeFunction("newRedisKVStore", [client](const std::shared_ptr<RedisClient>& redisClient, boost::optional<LuaAssociativeTable<boost::variant<string, bool, std::shared_ptr<GenericCacheInterface<std::string, std::string>>>>> vars) {
     if (client) {
       return std::shared_ptr<KeyValueStore>(nullptr);
     }
 
+    std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache;
     bool copyCacheEnabled{false};
-    bool resultCacheEnabled{false};
     boost::optional<std::string> lookupAction;
     boost::optional<std::string> dataName;
+    getOptionalValue<std::shared_ptr<GenericCacheInterface<std::string, std::string>>>(vars, "resultCache", resultCache);
     getOptionalValue<bool>(vars, "copyCacheEnabled", copyCacheEnabled);
-    getOptionalValue<bool>(vars, "resultCacheEnabled", resultCacheEnabled);
     getOptionalValue<std::string>(vars, "dataName", dataName);
     getOptionalValue<std::string>(vars, "lookupAction", lookupAction);
 
     checkAllParametersConsumed("newRedisKVStore", vars);
-    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisClient, lookupAction, dataName, copyCacheEnabled, resultCacheEnabled));
+    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisClient, lookupAction, dataName, copyCacheEnabled, resultCache));
   });
 #endif /* HAVE_REDIS */
 

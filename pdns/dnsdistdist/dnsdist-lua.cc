@@ -3193,6 +3193,7 @@ void setupLuaBindingsOnly(LuaContext& luaCtx, bool client, bool configCheck)
   setupLuaBindingsDNSCrypt(luaCtx, client);
   setupLuaBindingsDNSParser(luaCtx);
   setupLuaBindingsDNSQuestion(luaCtx);
+  setupLuaBindingsCache(luaCtx);
   setupLuaBindingsKVS(luaCtx, client);
   setupLuaBindingsRedis(luaCtx, client);
   setupLuaBindingsLogging(luaCtx);
