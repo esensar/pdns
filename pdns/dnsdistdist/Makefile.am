@@ -214,6 +214,7 @@ dnsdist_SOURCES = \
 	dnsdist-lua-bindings-dnscrypt.cc \
 	dnsdist-lua-bindings-dnsparser.cc \
 	dnsdist-lua-bindings-dnsquestion.cc \
+	dnsdist-lua-bindings-cache.cc \
 	dnsdist-lua-bindings-kvs.cc \
 	dnsdist-lua-bindings-redis.cc \
 	dnsdist-lua-bindings-network.cc \
@@ -280,6 +281,7 @@ dnsdist_SOURCES = \
 	ext/libbpf/libbpf.h \
 	ext/luawrapper/include/LuaContext.hpp \
 	fstrm_logger.cc fstrm_logger.hh \
+	generic-cache.hh generic-cache.cc \
 	gettime.cc gettime.hh \
 	htmlfiles.h \
 	iputils.cc iputils.hh \
@@ -383,6 +385,7 @@ testrunner_SOURCES = \
 	ednsoptions.cc ednsoptions.hh \
 	ednssubnet.cc ednssubnet.hh \
 	ext/luawrapper/include/LuaContext.hpp \
+	generic-cache.hh generic-cache.cc \
 	gettime.cc gettime.hh \
 	iputils.cc iputils.hh \
 	misc.cc misc.hh \

@@ -287,7 +287,7 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName, bool copyCacheEnabled, bool resultCacheEnabled)
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName, bool copyCacheEnabled, std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache)
 {
   std::unique_ptr<RedisLookupAction> command;
   if (lookupAction && !boost::iequals(lookupAction.get(), "get")) {
@@ -316,8 +316,8 @@ RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boos
     }
   }
   d_redis = std::make_unique<RedisKVClient>(redisClient, std::move(command));
-  if (resultCacheEnabled) {
-    d_redis = std::make_unique<ResultCachingRedisClient>(std::move(d_redis));
+  if (resultCache) {
+    d_redis = std::make_unique<ResultCachingRedisClient>(std::move(d_redis), resultCache);
   }
   if (copyCacheEnabled) {
     d_redis = std::make_unique<CopyCachingRedisClient>(std::move(d_redis));

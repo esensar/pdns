@@ -9,7 +9,7 @@
 
 #include "dnsdist-kvs.hh"
 
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
 static const ComboAddress v4ToMask("203.0.113.255");
 static const ComboAddress v6ToMask("2001:db8:ff:ff:ff:ff:ff:ff");
 
