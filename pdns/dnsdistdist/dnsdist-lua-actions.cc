@@ -375,7 +375,7 @@ void setupLuaActions(LuaContext& luaCtx)
   });
 #endif /* HAVE_DNS_OVER_HTTPS */
 
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   luaCtx.writeFunction("KeyValueStoreLookupAction", [](std::shared_ptr<KeyValueStore>& kvs, std::shared_ptr<KeyValueLookupKey>& lookupKey, const std::string& destinationTag) {
     return dnsdist::actions::getKeyValueStoreLookupAction(kvs, lookupKey, destinationTag);
   });
@@ -383,7 +383,7 @@ void setupLuaActions(LuaContext& luaCtx)
   luaCtx.writeFunction("KeyValueStoreRangeLookupAction", [](std::shared_ptr<KeyValueStore>& kvs, std::shared_ptr<KeyValueLookupKey>& lookupKey, const std::string& destinationTag) {
     return dnsdist::actions::getKeyValueStoreRangeLookupAction(kvs, lookupKey, destinationTag);
   });
-#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) */
+#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 
   luaCtx.writeFunction("NegativeAndSOAAction", [](bool nxd, const std::string& zone, uint32_t ttl, const std::string& mname, const std::string& rname, uint32_t serial, uint32_t refresh, uint32_t retry, uint32_t expire, uint32_t minimum, std::optional<responseParams_t> vars) {
     bool soaInAuthoritySection = false;

@@ -678,7 +678,7 @@ void setupLuaSelectors(LuaContext& luaCtx)
     return std::shared_ptr<DNSRule>(dnsdist::selectors::getTagSelector(tag, value, !value));
   });
 
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   luaCtx.writeFunction("KeyValueStoreLookupRule", [](std::shared_ptr<KeyValueStore>& kvs, std::shared_ptr<KeyValueLookupKey>& lookupKey) {
     return std::shared_ptr<DNSRule>(new KeyValueStoreLookupRule(kvs, lookupKey));
   });
@@ -686,7 +686,7 @@ void setupLuaSelectors(LuaContext& luaCtx)
   luaCtx.writeFunction("KeyValueStoreRangeLookupRule", [](std::shared_ptr<KeyValueStore>& kvs, std::shared_ptr<KeyValueLookupKey>& lookupKey) {
     return std::shared_ptr<DNSRule>(new KeyValueStoreRangeLookupRule(kvs, lookupKey));
   });
-#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) */
+#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 
 #include "dnsdist-lua-selectors-generated-body.hh"
 }
