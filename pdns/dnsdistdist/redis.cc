@@ -19,6 +19,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
+#include "threadname.hh"
+#include <condition_variable>
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -32,71 +34,62 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-std::unique_ptr<RedisReplyInterface<std::string>> RedisGetCommand::operator()(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<std::string>> RedisGetCommand::operator()(const RedisClient& client, const std::string& key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "GET %b", key.data(), key.length()));
-  return std::make_unique<RedisStringReply>(reply);
+  return std::make_unique<RedisStringReply>(client.executeCommand("GET %b", key.data(), key.length()));
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisExistsCommand::operator()(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisExistsCommand::operator()(const RedisClient& client, const std::string& key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "EXISTS %b", key.data(), key.length()));
-  return std::make_unique<RedisIntAsBoolReply>(std::make_unique<RedisIntReply>(reply));
+  return std::make_unique<RedisIntAsBoolReply>(std::make_unique<RedisIntReply>(client.executeCommand("EXISTS %b", key.data(), key.length())));
 }
 
-std::unique_ptr<RedisReplyInterface<std::string>> RedisHGetCommand::operator()(redisContext* context, const std::string& hash_key, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<std::string>> RedisHGetCommand::operator()(const RedisClient& client, const std::string& hash_key, const std::string& key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HGET %b %b", hash_key.data(), hash_key.length(), key.data(), key.length()));
-  return std::make_unique<RedisStringReply>(reply);
+  return std::make_unique<RedisStringReply>(client.executeCommand("HGET %b %b", hash_key.data(), hash_key.length(), key.data(), key.length()));
 }
 
-std::unique_ptr<RedisReplyInterface<std::unordered_map<std::string, std::string>>> RedisHGetAllCommand::operator()(redisContext* context, const std::string& hash_key) const
+std::unique_ptr<RedisReplyInterface<std::unordered_map<std::string, std::string>>> RedisHGetAllCommand::operator()(const RedisClient& client, const std::string& hash_key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HGETALL %b", hash_key.data(), hash_key.length()));
-  return std::make_unique<RedisHashReply>(reply);
+  return std::make_unique<RedisHashReply>(client.executeCommand("HGETALL %b", hash_key.data(), hash_key.length()));
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisHExistsCommand::operator()(redisContext* context, const std::string& hash_key, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisHExistsCommand::operator()(const RedisClient& client, const std::string& hash_key, const std::string& key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "HEXISTS %b %b", hash_key.data(), hash_key.length(), key.data(), key.length()));
-  return std::make_unique<RedisIntAsBoolReply>(std::make_unique<RedisIntReply>(reply));
+  return std::make_unique<RedisIntAsBoolReply>(std::make_unique<RedisIntReply>(client.executeCommand("HEXISTS %b %b", hash_key.data(), hash_key.length(), key.data(), key.length())));
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisSIsMemberCommand::operator()(redisContext* context, const std::string& set_key, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisSIsMemberCommand::operator()(const RedisClient& client, const std::string& set_key, const std::string& key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SISMEMBER %b %b", set_key.data(), set_key.length(), key.data(), key.length()));
-  return std::make_unique<RedisIntAsBoolReply>(std::make_unique<RedisIntReply>(reply));
+  return std::make_unique<RedisIntAsBoolReply>(std::make_unique<RedisIntReply>(client.executeCommand("SISMEMBER %b %b", set_key.data(), set_key.length(), key.data(), key.length())));
 }
 
-std::unique_ptr<RedisReplyInterface<std::unordered_set<std::string>>> RedisSMembersCommand::operator()(redisContext* context, const std::string& set_key) const
+std::unique_ptr<RedisReplyInterface<std::unordered_set<std::string>>> RedisSMembersCommand::operator()(const RedisClient& client, const std::string& set_key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SMEMBERS %b", set_key.data(), set_key.length()));
-  return std::make_unique<RedisSetReply>(reply);
+  return std::make_unique<RedisSetReply>(client.executeCommand("SMEMBERS %b", set_key.data(), set_key.length()));
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisSScanCommand::operator()(redisContext* context, const std::string& set_key, const size_t& cursor, const std::string& key, const size_t& count) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisSScanCommand::operator()(const RedisClient& client, const std::string& set_key, const size_t& cursor, const std::string& key, const size_t& count) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %b %d %b %d", set_key.data(), set_key.length(), cursor, key.data(), key.length(), count));
-  return std::make_unique<RedisScanAsBoolReply>(reply);
+  return std::make_unique<RedisScanAsBoolReply>(client.executeCommand("SSCAN %b %d %b %d", set_key.data(), set_key.length(), cursor, key.data(), key.length(), count));
 }
 
-std::unique_ptr<RedisReplyInterface<std::unordered_set<std::string>>> RedisZrangeBylexCommand::operator()(redisContext* context, const std::string& set_key, const size_t& start, const size_t& stop) const
+std::unique_ptr<RedisReplyInterface<std::unordered_set<std::string>>> RedisZrangeBylexCommand::operator()(const RedisClient& client, const std::string& set_key, const size_t& start, const size_t& stop) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "ZRANGE %b %d %d BYLEX", set_key.data(), set_key.length(), start, stop));
-  return std::make_unique<RedisSetReply>(reply);
+  return std::make_unique<RedisSetReply>(client.executeCommand("ZRANGE %b %d %d BYLEX", set_key.data(), set_key.length(), start, stop));
 }
 
-std::unique_ptr<RedisReplyInterface<std::string>> RedisGetLookupAction::getValue(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<std::string>> RedisGetLookupAction::getValue(const RedisClient& client, const std::string& key) const
 {
-  return d_getCommand(context, d_prefix + key);
+  return d_getCommand(client, d_prefix + key);
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisGetLookupAction::keyExists(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisGetLookupAction::keyExists(const RedisClient& client, const std::string& key) const
 {
-  return d_existsCommand(context, d_prefix + key);
+  return d_existsCommand(client, d_prefix + key);
 }
 
-std::unordered_map<std::string, std::string> RedisGetLookupAction::generateCopyCache([[maybe_unused]] redisContext* context) const
+std::unordered_map<std::string, std::string> RedisGetLookupAction::generateCopyCache([[maybe_unused]] const RedisClient& client) const
 {
   return {};
 }
@@ -106,19 +99,19 @@ bool RedisGetLookupAction::getFromCopyCache([[maybe_unused]] const GenericCacheI
   return false;
 }
 
-std::unique_ptr<RedisReplyInterface<std::string>> RedisHGetLookupAction::getValue(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<std::string>> RedisHGetLookupAction::getValue(const RedisClient& client, const std::string& key) const
 {
-  return d_getCommand(context, d_hash_key, key);
+  return d_getCommand(client, d_hash_key, key);
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisHGetLookupAction::keyExists(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisHGetLookupAction::keyExists(const RedisClient& client, const std::string& key) const
 {
-  return d_existsCommand(context, d_hash_key, key);
+  return d_existsCommand(client, d_hash_key, key);
 }
 
-std::unordered_map<std::string, std::string> RedisHGetLookupAction::generateCopyCache(redisContext* context) const
+std::unordered_map<std::string, std::string> RedisHGetLookupAction::generateCopyCache(const RedisClient& client) const
 {
-  return d_getAllCommand(context, d_hash_key)->getValue();
+  return d_getAllCommand(client, d_hash_key)->getValue();
 }
 
 bool RedisHGetLookupAction::getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const
@@ -126,19 +119,19 @@ bool RedisHGetLookupAction::getFromCopyCache(const GenericCacheInterface<std::st
   return cache.getValue(key, value);
 }
 
-std::unique_ptr<RedisReplyInterface<std::string>> RedisSismemberLookupAction::getValue(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<std::string>> RedisSismemberLookupAction::getValue(const RedisClient& client, const std::string& key) const
 {
-  return std::make_unique<RedisBoolAsStringReply>(d_sIsMemberCommand(context, d_set_key, key));
+  return std::make_unique<RedisBoolAsStringReply>(d_sIsMemberCommand(client, d_set_key, key));
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisSismemberLookupAction::keyExists(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisSismemberLookupAction::keyExists(const RedisClient& client, const std::string& key) const
 {
-  return d_sIsMemberCommand(context, d_set_key, key);
+  return d_sIsMemberCommand(client, d_set_key, key);
 }
 
-std::unordered_map<std::string, std::string> RedisSismemberLookupAction::generateCopyCache(redisContext* context) const
+std::unordered_map<std::string, std::string> RedisSismemberLookupAction::generateCopyCache(const RedisClient& client) const
 {
-  auto elements = d_sMembersCommand(context, d_set_key)->getValue();
+  auto elements = d_sMembersCommand(client, d_set_key)->getValue();
   std::unordered_map<std::string, std::string> result{elements.size()};
   for (auto element : elements) {
     result.emplace(element, "1");
@@ -155,22 +148,20 @@ bool RedisSismemberLookupAction::getFromCopyCache(const GenericCacheInterface<st
   return false;
 }
 
-std::unique_ptr<RedisReplyInterface<std::string>> RedisSscanLookupAction::getValue(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<std::string>> RedisSscanLookupAction::getValue(const RedisClient& client, const std::string& key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %b 0 %b", d_set_key.data(), d_set_key.length(), key.data(), key.length()));
-  return std::make_unique<RedisScanAsStringReply>(reply);
+  return std::make_unique<RedisScanAsStringReply>(client.executeCommand("SSCAN %b 0 %b", d_set_key.data(), d_set_key.length(), key.data(), key.length()));
 }
 
-std::unique_ptr<RedisReplyInterface<bool>> RedisSscanLookupAction::keyExists(redisContext* context, const std::string& key) const
+std::unique_ptr<RedisReplyInterface<bool>> RedisSscanLookupAction::keyExists(const RedisClient& client, const std::string& key) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SSCAN %b 0 %b", d_set_key.data(), d_set_key.length(), key.data(), key.length()));
-  return std::make_unique<RedisScanAsBoolReply>(reply);
+  return std::make_unique<RedisScanAsBoolReply>(client.executeCommand("SSCAN %b 0 %b", d_set_key.data(), d_set_key.length(), key.data(), key.length()));
 }
 
-std::unordered_map<std::string, std::string> RedisSscanLookupAction::generateCopyCache(redisContext* context) const
+std::unordered_map<std::string, std::string> RedisSscanLookupAction::generateCopyCache(const RedisClient& client) const
 {
-  redisReply* reply = static_cast<redisReply*>(redisCommand(context, "SMEMBERS %b", d_set_key.data(), d_set_key.length()));
-  auto elements = RedisSetReply(reply).getValue();
+  RedisSetReply reply{client.executeCommand("SMEMBERS %b", d_set_key.data(), d_set_key.length())};
+  auto elements = reply.getValue();
   std::unordered_map<std::string, std::string> result{elements.size()};
   for (auto element : elements) {
     result.emplace(element, "1");
@@ -185,6 +176,114 @@ bool RedisSscanLookupAction::getFromCopyCache(const GenericCacheInterface<std::s
     return true;
   }
   return false;
+}
+
+redisReply* RedisClient::executeCommand(const char* format, ...) const
+{
+  va_list ap;
+  va_start(ap, format);
+  auto result = d_executor->executeCommand(format, ap);
+  va_end(ap);
+  vinfolog("Received reply in the client...: %x", result);
+  return result;
+};
+
+redisReply* RedisClient::DirectExecutor::executeCommand(const char* format, va_list ap) const
+{
+  auto connection = d_connection.getConnection();
+  auto result = static_cast<redisReply*>(redisvCommand(connection->get(), format, ap));
+  if (connection->get()->err != 0) {
+    vinfolog("Redis connection error %s", connection->get()->errstr);
+  }
+  return result;
+}
+
+RedisClient::PipelineExecutor::PipelineExecutor(const std::string& url, uint32_t pipelineInterval) :
+  d_connection(url), d_interval(pipelineInterval)
+{
+  auto [sender, receiver] = pdns::channel::createObjectQueue<PipelineCommand>();
+  d_pipelineSender = std::move(sender);
+  d_pipelineReceiver = std::move(receiver);
+
+  d_thread = std::thread(&RedisClient::PipelineExecutor::maintenanceThread, this);
+}
+
+redisReply* RedisClient::PipelineExecutor::executeCommand(const char* format, va_list ap) const
+{
+  char* command;
+  auto len = redisvFormatCommand(&command, format, ap);
+  if (len < 0) {
+    // TODO: handle formatting errors?
+    return nullptr;
+  }
+
+  std::mutex mtx;
+  std::condition_variable cv;
+  std::unique_lock<std::mutex> lock(mtx);
+  std::shared_ptr<redisReply*> result = std::make_shared<redisReply*>(nullptr);
+  PipelineCommand::callback_t callback = [result, &cv](redisReply* reply) mutable {
+    vinfolog("Callback!!! Reply: %x", reply);
+    *result = reply;
+    cv.notify_one();
+  };
+  d_pipelineSender.send(std::make_unique<PipelineCommand>(PipelineCommand{
+    command,
+    len,
+    callback}));
+  vinfolog("Gonna wait!!!");
+  cv.wait(lock);
+  vinfolog("waited!!! Result: %x", *result);
+  return *result;
+}
+
+void RedisClient::PipelineExecutor::maintenanceThread()
+{
+  setThreadName("dnsdist/redis");
+
+  for (;;) {
+    if (d_exiting) {
+      break;
+    }
+
+    bool connected = true;
+    if (d_connection.needsReconnect()) {
+      connected = d_connection.reconnect();
+    }
+
+    if (connected) {
+      auto connection = d_connection.getConnection();
+      std::list<PipelineCommand::callback_t> callbacks;
+      while (auto command = d_pipelineReceiver.receive()) {
+        redisAppendFormattedCommand(connection->get(), command->get()->command, command->get()->length);
+        callbacks.push_back(command->get()->callback);
+      }
+
+      for (auto callback : callbacks) {
+        void* reply;
+        if (redisGetReply(connection->get(), &reply) == REDIS_OK) {
+          callback(static_cast<redisReply*>(reply));
+        }
+        else {
+          if (connection->get()->err != 0) {
+            vinfolog("Redis connection error %s", connection->get()->errstr);
+          }
+          else {
+            vinfolog("Unknown redis connection error");
+          }
+          callback(nullptr);
+        }
+      }
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(d_interval));
+  }
+};
+
+RedisClient::PipelineExecutor::~PipelineExecutor()
+{
+  d_exiting = true;
+
+  d_thread.join();
 }
 
 bool ResultCachingRedisClient::getValue(const std::string& key, std::string& value)
@@ -294,33 +393,34 @@ bool CopyCachingRedisClient::keyExists(const std::string& key)
 
 bool RedisKVClient::getValue(const std::string& key, std::string& value)
 {
-  auto connection = d_client->getConnection();
-  auto reply = d_lookupAction->getValue(connection->get(), key);
+  vinfolog("Looking up something...");
+  auto reply = d_lookupAction->getValue(*d_client, key);
+  vinfolog("Got a reply...");
 
   if (reply->ok()) {
+    vinfolog("Reply is ok.");
     value = reply->getValue();
     vinfolog("Got value %s for key '%s'", value, key);
     return true;
   }
 
-  vinfolog("Error while looking up key '%s' from Redis: %s", key, (connection->get())->errstr);
+  vinfolog("Error while looking up key '%s' from Redis: %s", key, reply->getError());
   return false;
 }
 
 std::unordered_map<std::string, std::string> RedisKVClient::generateCopyCache()
 {
-  return d_lookupAction->generateCopyCache(d_client->getConnection()->get());
+  return d_lookupAction->generateCopyCache(*d_client);
 }
 
 bool RedisKVClient::keyExists(const std::string& key)
 {
-  auto connection = d_client->getConnection();
-  auto reply = d_lookupAction->keyExists(connection->get(), key);
+  auto reply = d_lookupAction->keyExists(*d_client, key);
   if (reply->ok()) {
     return reply->getValue();
   }
 
-  vinfolog("Error while looking up key '%s' from Redis: %s", key, (connection->get())->errstr);
+  vinfolog("Error while looking up key '%s' from Redis: %s", key, reply->getError());
   return false;
 }
 
@@ -367,11 +467,28 @@ RedisClient::RedisConnection::RedisConnection(const std::string& url)
 
 bool RedisClient::RedisConnection::reconnect()
 {
-  auto context = d_context.read_only_lock();
-  if (context->get() != nullptr) {
-    int result = redisReconnect(context->get());
-    return result == REDIS_OK;
+  {
+    auto context = d_context.read_only_lock();
+    if (context->get() != nullptr) {
+      int result = redisReconnect(context->get());
+      return result == REDIS_OK;
+    }
   }
 
-  return false;
+  auto context = std::unique_ptr<redisContext, decltype(&redisFree)>(redisConnect(d_url.host.c_str(), d_url.port), redisFree);
+  // Check if the context is null or if a specific
+  // error occurred.
+  if (context == nullptr || context->err) {
+    if (context != nullptr) {
+      warnlog("Error connecting to redis: %s", context->errstr);
+      return false;
+    }
+    else {
+      warnlog("Can't allocate redis context");
+      return false;
+    }
+  }
+
+  *(d_context.lock()) = std::move(context);
+  return true;
 }

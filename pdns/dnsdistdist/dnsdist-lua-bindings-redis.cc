@@ -37,14 +37,13 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return std::make_shared<RedisClient>(url);
   });
 
-  luaCtx.registerFunction<std::string (std::shared_ptr<RedisClient>::*)(const std::string&)>("get", [](std::shared_ptr<RedisClient>& kvs, const std::string& key) {
+  luaCtx.registerFunction<std::string (std::shared_ptr<RedisClient>::*)(const std::string&)>("get", [](std::shared_ptr<RedisClient>& rc, const std::string& key) {
     std::string result;
-    if (!kvs) {
+    if (!rc) {
       return result;
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisGetCommand{}(connection->get(), key);
+    auto reply = RedisGetCommand{}(*rc, key);
 
     if (reply->ok()) {
       result = reply->getValue();
@@ -53,13 +52,12 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return result;
   });
 
-  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&)>("exists", [](std::shared_ptr<RedisClient>& kvs, const std::string& key) {
-    if (!kvs) {
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&)>("exists", [](std::shared_ptr<RedisClient>& rc, const std::string& key) {
+    if (!rc) {
       return false;
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisExistsCommand{}(connection->get(), key);
+    auto reply = RedisExistsCommand{}(*rc, key);
 
     if (reply->ok()) {
       return reply->getValue();
@@ -68,14 +66,13 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return false;
   });
 
-  luaCtx.registerFunction<std::string (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("hget", [](std::shared_ptr<RedisClient>& kvs, const std::string& hash_key, const std::string& key) {
+  luaCtx.registerFunction<std::string (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("hget", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key, const std::string& key) {
     std::string result;
-    if (!kvs) {
+    if (!rc) {
       return result;
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisHGetCommand{}(connection->get(), hash_key, key);
+    auto reply = RedisHGetCommand{}(*rc, hash_key, key);
 
     if (reply->ok()) {
       result = reply->getValue();
@@ -84,13 +81,12 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return result;
   });
 
-  luaCtx.registerFunction<LuaAssociativeTable<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("hgetall", [](std::shared_ptr<RedisClient>& kvs, const std::string& hash_key) {
-    if (!kvs) {
+  luaCtx.registerFunction<LuaAssociativeTable<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("hgetall", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key) {
+    if (!rc) {
       return LuaAssociativeTable<std::string>();
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisHGetAllCommand{}(connection->get(), hash_key);
+    auto reply = RedisHGetAllCommand{}(*rc, hash_key);
 
     if (reply->ok()) {
       return reply->getValue();
@@ -99,13 +95,12 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return LuaAssociativeTable<std::string>();
   });
 
-  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("hexists", [](std::shared_ptr<RedisClient>& kvs, const std::string& hash_key, const std::string& key) {
-    if (!kvs) {
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("hexists", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key, const std::string& key) {
+    if (!rc) {
       return false;
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisHExistsCommand{}(connection->get(), hash_key, key);
+    auto reply = RedisHExistsCommand{}(*rc, hash_key, key);
 
     if (reply->ok()) {
       return reply->getValue();
@@ -114,13 +109,12 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return false;
   });
 
-  luaCtx.registerFunction<LuaArray<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("smembers", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key) {
-    if (!kvs) {
+  luaCtx.registerFunction<LuaArray<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("smembers", [](std::shared_ptr<RedisClient>& rc, const std::string& set_key) {
+    if (!rc) {
       return LuaArray<std::string>();
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisSMembersCommand{}(connection->get(), set_key);
+    auto reply = RedisSMembersCommand{}(*rc, set_key);
 
     if (reply->ok()) {
       auto members = reply->getValue();
@@ -134,13 +128,12 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return LuaArray<std::string>();
   });
 
-  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("sismember", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key, const std::string& key) {
-    if (!kvs) {
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("sismember", [](std::shared_ptr<RedisClient>& rc, const std::string& set_key, const std::string& key) {
+    if (!rc) {
       return false;
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisSIsMemberCommand{}(connection->get(), set_key, key);
+    auto reply = RedisSIsMemberCommand{}(*rc, set_key, key);
 
     if (reply->ok()) {
       return reply->getValue();
@@ -149,13 +142,12 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return false;
   });
 
-  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const int&, const std::string&, const int&)>("sscan", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key, const int& cursor, const std::string& key, const int& count) {
-    if (!kvs) {
+  luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const int&, const std::string&, const int&)>("sscan", [](std::shared_ptr<RedisClient>& rc, const std::string& set_key, const int& cursor, const std::string& key, const int& count) {
+    if (!rc) {
       return false;
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisSScanCommand{}(connection->get(), set_key, cursor, key, count);
+    auto reply = RedisSScanCommand{}(*rc, set_key, cursor, key, count);
 
     if (reply->ok()) {
       return reply->getValue();
@@ -164,13 +156,12 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return false;
   });
 
-  luaCtx.registerFunction<LuaArray<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&, const int&, const int&)>("zrangebylex", [](std::shared_ptr<RedisClient>& kvs, const std::string& set_key, const int& start, const int& stop) {
-    if (!kvs) {
+  luaCtx.registerFunction<LuaArray<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&, const int&, const int&)>("zrangebylex", [](std::shared_ptr<RedisClient>& rc, const std::string& set_key, const int& start, const int& stop) {
+    if (!rc) {
       return LuaArray<std::string>();
     }
 
-    auto connection = kvs->getConnection();
-    auto reply = RedisZrangeBylexCommand{}(connection->get(), set_key, start, stop);
+    auto reply = RedisZrangeBylexCommand{}(*rc, set_key, start, stop);
 
     if (reply->ok()) {
       auto members = reply->getValue();
