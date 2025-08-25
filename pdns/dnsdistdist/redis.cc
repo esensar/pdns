@@ -184,7 +184,6 @@ redisReply* RedisClient::executeCommand(const char* format, ...) const
   va_start(ap, format);
   auto result = d_executor->executeCommand(format, ap);
   va_end(ap);
-  vinfolog("Received reply in the client...: %x", result);
   return result;
 };
 
@@ -222,7 +221,6 @@ redisReply* RedisClient::PipelineExecutor::executeCommand(const char* format, va
   std::unique_lock<std::mutex> lock(mtx);
   std::shared_ptr<redisReply*> result = std::make_shared<redisReply*>(nullptr);
   PipelineCommand::callback_t callback = [result, &cv](redisReply* reply) mutable {
-    vinfolog("Callback!!! Reply: %x", reply);
     *result = reply;
     cv.notify_one();
   };
@@ -230,9 +228,7 @@ redisReply* RedisClient::PipelineExecutor::executeCommand(const char* format, va
     command,
     len,
     callback}));
-  vinfolog("Gonna wait!!!");
   cv.wait(lock);
-  vinfolog("waited!!! Result: %x", *result);
   return *result;
 }
 
@@ -393,14 +389,10 @@ bool CopyCachingRedisClient::keyExists(const std::string& key)
 
 bool RedisKVClient::getValue(const std::string& key, std::string& value)
 {
-  vinfolog("Looking up something...");
   auto reply = d_lookupAction->getValue(*d_client, key);
-  vinfolog("Got a reply...");
 
   if (reply->ok()) {
-    vinfolog("Reply is ok.");
     value = reply->getValue();
-    vinfolog("Got value %s for key '%s'", value, key);
     return true;
   }
 
