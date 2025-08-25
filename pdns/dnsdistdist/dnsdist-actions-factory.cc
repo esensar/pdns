@@ -2041,7 +2041,7 @@ private:
 };
 #endif /* HAVE_DNS_OVER_HTTPS || HAVE_DNS_OVER_HTTP3 */
 
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
 class KeyValueStoreLookupAction : public DNSAction
 {
 public:
@@ -2113,7 +2113,7 @@ private:
   std::shared_ptr<KeyValueLookupKey> d_key;
   std::string d_tag;
 };
-#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) */
+#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 
 class SetMaxReturnedTTLAction : public DNSAction
 {
