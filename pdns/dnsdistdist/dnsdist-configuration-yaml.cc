@@ -40,6 +40,7 @@
 #include "dnsdist-xsk.hh"
 #include "doh.hh"
 #include "fstrm_logger.hh"
+#include "generic-cache.hh"
 #include "iputils.hh"
 #include "remote_logger.hh"
 #include "remote_logger_pool.hh"
@@ -1569,7 +1570,7 @@ std::shared_ptr<DNSSelector> getNetmaskGroupSelector(const NetmaskGroupSelectorC
 
 std::shared_ptr<DNSActionWrapper> getKeyValueStoreLookupAction([[maybe_unused]] const KeyValueStoreLookupActionConfiguration& config)
 {
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   auto kvs = dnsdist::configuration::yaml::getRegisteredTypeByName<KeyValueStore>(std::string(config.kvs_name));
   if (!kvs && !(dnsdist::configuration::yaml::s_inClientMode || dnsdist::configuration::yaml::s_inConfigCheckMode)) {
     throw std::runtime_error("Unable to find the key-value store named '" + std::string(config.kvs_name) + "'");
@@ -1587,7 +1588,7 @@ std::shared_ptr<DNSActionWrapper> getKeyValueStoreLookupAction([[maybe_unused]] 
 
 std::shared_ptr<DNSActionWrapper> getKeyValueStoreRangeLookupAction([[maybe_unused]] const KeyValueStoreRangeLookupActionConfiguration& config)
 {
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   auto kvs = dnsdist::configuration::yaml::getRegisteredTypeByName<KeyValueStore>(std::string(config.kvs_name));
   if (!kvs && !(dnsdist::configuration::yaml::s_inClientMode || dnsdist::configuration::yaml::s_inConfigCheckMode)) {
     throw std::runtime_error("Unable to find the key-value store named '" + std::string(config.kvs_name) + "'");
@@ -1605,7 +1606,7 @@ std::shared_ptr<DNSActionWrapper> getKeyValueStoreRangeLookupAction([[maybe_unus
 
 std::shared_ptr<DNSSelector> getKeyValueStoreLookupSelector([[maybe_unused]] const KeyValueStoreLookupSelectorConfiguration& config)
 {
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   auto kvs = dnsdist::configuration::yaml::getRegisteredTypeByName<KeyValueStore>(std::string(config.kvs_name));
   if (!kvs && !(dnsdist::configuration::yaml::s_inClientMode || dnsdist::configuration::yaml::s_inConfigCheckMode)) {
     throw std::runtime_error("Unable to find the key-value store named '" + std::string(config.kvs_name) + "'");
@@ -1623,7 +1624,7 @@ std::shared_ptr<DNSSelector> getKeyValueStoreLookupSelector([[maybe_unused]] con
 
 std::shared_ptr<DNSSelector> getKeyValueStoreRangeLookupSelector([[maybe_unused]] const KeyValueStoreRangeLookupSelectorConfiguration& config)
 {
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   auto kvs = dnsdist::configuration::yaml::getRegisteredTypeByName<KeyValueStore>(std::string(config.kvs_name));
   if (!kvs && !(dnsdist::configuration::yaml::s_inClientMode || dnsdist::configuration::yaml::s_inConfigCheckMode)) {
     throw std::runtime_error("Unable to find the key-value store named '" + std::string(config.kvs_name) + "'");
@@ -1831,7 +1832,7 @@ void registerDnstapLogger([[maybe_unused]] const DnstapLoggerConfiguration& conf
 
 void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& config)
 {
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
   bool createObjects = !dnsdist::configuration::yaml::s_inClientMode && !dnsdist::configuration::yaml::s_inConfigCheckMode;
 #if defined(HAVE_LMDB)
   for (const auto& lmdb : config.lmdb) {
@@ -1845,6 +1846,22 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
     dnsdist::configuration::yaml::registerType<KeyValueStore>(store, cdb.name);
   }
 #endif /* defined(HAVE_CDB) */
+#if defined(HAVE_REDIS)
+  for (const auto& redis : config.redis) {
+    if (createObjects) {
+      auto client = std::make_shared<RedisClient>(std::string(redis.url), redis.pipeline_enabled, redis.pipeline_interval);
+      std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache;
+      if (redis.result_cache_enabled) {
+        resultCache = std::make_shared<BasicCache<std::string, std::string>>();
+      }
+      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), redis.copy_cache_enabled, resultCache));
+      dnsdist::configuration::yaml::registerType<KeyValueStore>(store, redis.name);
+    }
+    else {
+      dnsdist::configuration::yaml::registerType<KeyValueStore>(std::shared_ptr<KeyValueStore>(), redis.name);
+    }
+  }
+#endif /* defined(HAVE_REDIS) */
   for (const auto& key : config.lookup_keys.source_ip_keys) {
     auto lookup = createObjects ? std::shared_ptr<KeyValueLookupKey>(std::make_shared<KeyValueLookupKeySourceIP>(key.v4_mask, key.v6_mask, key.include_port)) : std::shared_ptr<KeyValueLookupKey>();
     dnsdist::configuration::yaml::registerType<KeyValueLookupKey>(lookup, key.name);
@@ -1861,7 +1878,7 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
     auto lookup = createObjects ? std::shared_ptr<KeyValueLookupKey>(std::make_shared<KeyValueLookupKeyTag>(std::string(key.tag))) : std::shared_ptr<KeyValueLookupKey>();
     dnsdist::configuration::yaml::registerType<KeyValueLookupKey>(lookup, key.name);
   }
-#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) */
+#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 }
 
 void registerNMGObjects(const ::rust::Vec<NetmaskGroupConfiguration>& nmgs)

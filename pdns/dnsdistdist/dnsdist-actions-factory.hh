@@ -74,10 +74,10 @@ std::shared_ptr<DNSAction> getSetProxyProtocolValuesAction(const std::vector<std
 std::shared_ptr<DNSAction> getRCodeAction(uint8_t rcode, const dnsdist::ResponseConfig& responseConfig);
 std::shared_ptr<DNSAction> getERCodeAction(uint8_t rcode, const dnsdist::ResponseConfig& responseConfig);
 
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
 std::shared_ptr<DNSAction> getKeyValueStoreLookupAction(std::shared_ptr<KeyValueStore>& kvs, std::shared_ptr<KeyValueLookupKey>& lookupKey, const std::string& destinationTag);
 std::shared_ptr<DNSAction> getKeyValueStoreRangeLookupAction(std::shared_ptr<KeyValueStore>& kvs, std::shared_ptr<KeyValueLookupKey>& lookupKey, const std::string& destinationTag);
-#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) */
+#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 
 std::shared_ptr<DNSAction> getSetECSAction(const std::string& ipv4);
 std::shared_ptr<DNSAction> getSetECSAction(const std::string& ipv4, const std::string& ipv6);

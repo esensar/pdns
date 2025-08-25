@@ -306,9 +306,40 @@ cdb_kv_store:
     - name: "file_name"
       type: "String"
       description: "The path to an existing CDB database"
-    - name: "refresh_delay"
+
+redis_kv_store:
+  description: "Redis-based key-value store"
+  parameters:
+    - name: "name"
+      type: "String"
+      description: "The name of this object"
+    - name: "url"
+      type: "String"
+      description: "The url to the Redis instance"
+    - name: "pipeline_enabled"
+      type: "bool"
+      default: "true"
+      description: "Whether pipelining is enabled for the redis client"
+    - name: "pipeline_interval"
       type: "u32"
-      description: "The delay in seconds between two checks of the database modification time. 0 means disabled"
+      default: "10"
+      description: "Interval in milliseconds in which to collect commands to pipeline to redis"
+    - name: "lookup_action"
+      type: "String"
+      default: "get"
+      description: "Redis command to use to look up keys"
+    - name: "data_name"
+      type: "String"
+      default: ""
+      description: "Data name"
+    - name: "copy_cache_enabled"
+      type: "bool"
+      default: "true"
+      description: "Whether the copy cache should be enabled for this redis KV store"
+    - name: "result_cache_enabled"
+      type: "bool"
+      default: "true"
+      description: "Whether the result cache should be enabled for this redis KV store"
 
 kvs_lookup_key_source_ip:
   description: "Lookup key that can be used with :ref:`yaml-settings-KeyValueStoreLookupAction` or :ref:`yaml-settings-KeyValueStoreLookupSelector`, will return the source IP of the client in network byte-order"
@@ -404,6 +435,10 @@ key_value_stores:
       type: "Vec<CdbKvStoreConfiguration>"
       default: true
       description: "List of CDB-based key-value stores"
+    - name: "redis"
+      type: "Vec<RedisKvStoreConfiguration>"
+      default: true
+      description: "List of Redis-based key-value stores"
     - name: "lookup_keys"
       type: "KvsLookupKeysConfiguration"
       default: true
