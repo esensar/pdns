@@ -516,6 +516,23 @@ private:
   std::shared_ptr<GenericCacheInterface<std::string, std::string>> d_resultCache;
 };
 
+class NegativeCachingRedisClient : public RedisKVClientInterface
+{
+public:
+  NegativeCachingRedisClient(std::unique_ptr<RedisKVClientInterface> client, std::shared_ptr<GenericCacheInterface<std::string, std::string>> cache) :
+    d_client(std::move(client)), d_negativeCache(cache)
+  {
+  }
+
+  bool getValue(const std::string& key, std::string& value) override;
+  std::unordered_map<std::string, std::string> generateCopyCache() override;
+  bool keyExists(const std::string& key) override;
+
+private:
+  std::unique_ptr<RedisKVClientInterface> d_client;
+  std::shared_ptr<GenericCacheInterface<std::string, std::string>> d_negativeCache;
+};
+
 class CopyCache : public GenericCacheInterface<std::string, std::string>
 {
 public:

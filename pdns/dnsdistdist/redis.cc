@@ -311,6 +311,37 @@ bool ResultCachingRedisClient::keyExists(const std::string& key)
   return d_client->keyExists(key);
 }
 
+bool NegativeCachingRedisClient::getValue(const std::string& key, std::string& value)
+{
+  if (d_negativeCache->contains(key)) {
+    return false;
+  }
+
+  auto found = d_client->getValue(key, value);
+  if (!found) {
+    d_negativeCache->insert(key, "");
+  }
+  return found;
+}
+
+std::unordered_map<std::string, std::string> NegativeCachingRedisClient::generateCopyCache()
+{
+  return d_client->generateCopyCache();
+}
+
+bool NegativeCachingRedisClient::keyExists(const std::string& key)
+{
+  if (d_negativeCache->contains(key)) {
+    return false;
+  }
+
+  auto found = d_client->keyExists(key);
+  if (!found) {
+    d_negativeCache->insert(key, "");
+  }
+  return found;
+}
+
 void CopyCache::insert(const std::string& key, std::string value)
 {
   auto map = d_map.write_lock();
@@ -345,7 +376,6 @@ bool CopyCache::needsUpdate() const
   struct timespec now;
   gettime(&now);
   auto nowMs = now.tv_sec * 1000 + now.tv_nsec / 1000000L;
-  vinfolog("needsUpdate(lastInsert: %d, ttl: %d, now: %d): %s", d_lastInsertMs, d_ttlMs, nowMs, (d_lastInsertMs + d_ttlMs < nowMs) ? "true" : "false");
   return d_lastInsertMs + d_ttlMs < nowMs;
 };
 

@@ -1851,10 +1851,14 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
     if (createObjects) {
       auto client = std::make_shared<RedisClient>(std::string(redis.url), redis.pipeline_enabled, redis.pipeline_interval);
       std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache;
+      std::shared_ptr<GenericCacheInterface<std::string, std::string>> negativeCache;
       if (redis.result_cache_enabled) {
         resultCache = std::make_shared<BasicCache<std::string, std::string>>();
       }
-      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache));
+      if (redis.negative_cache_enabled) {
+        negativeCache = std::make_shared<BasicCache<std::string, std::string>>();
+      }
+      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache));
       dnsdist::configuration::yaml::registerType<KeyValueStore>(store, redis.name);
     }
     else {
