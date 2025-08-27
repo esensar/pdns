@@ -19,6 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
+#include "gettime.hh"
 #include "threadname.hh"
 #include <condition_variable>
 #ifdef HAVE_CONFIG_H
@@ -318,6 +319,10 @@ void CopyCache::insert(const std::string& key, std::string value)
 
 bool CopyCache::getValue(const std::string& key, std::string& value) const
 {
+  if (needsUpdate()) {
+    return false;
+  }
+
   auto map = d_map.read_lock();
 
   auto entry = map->find(key);
@@ -337,26 +342,51 @@ bool CopyCache::contains(const std::string& key) const
 
 bool CopyCache::needsUpdate() const
 {
-  auto map = d_map.read_lock();
-  return map->size() == 0;
+  struct timespec now;
+  gettime(&now);
+  auto nowMs = now.tv_sec * 1000 + now.tv_nsec / 1000000L;
+  vinfolog("needsUpdate(lastInsert: %d, ttl: %d, now: %d): %s", d_lastInsertMs, d_ttlMs, nowMs, (d_lastInsertMs + d_ttlMs < nowMs) ? "true" : "false");
+  return d_lastInsertMs + d_ttlMs < nowMs;
 };
 
 void CopyCache::insertBatch(std::unordered_map<std::string, std::string> batch) const
 {
   auto map = d_map.write_lock();
 
+  map->clear();
   for (auto entry : batch) {
     map->emplace(entry);
   }
+  struct timespec now;
+  gettime(&now);
+  d_lastInsertMs = now.tv_sec * 1000 + now.tv_nsec / 1000000L;
 };
 
-size_t CopyCache::purgeExpired([[maybe_unused]] size_t upTo, [[maybe_unused]] const time_t now)
+size_t CopyCache::purgeExpired([[maybe_unused]] size_t upTo, const time_t now)
 {
+  if (d_lastInsertMs < now * 1000 - d_ttlMs) {
+    return expunge(upTo);
+  }
+
   return 0;
 };
 size_t CopyCache::expunge([[maybe_unused]] size_t upTo)
 {
-  return 0;
+  auto map = d_map.write_lock();
+  size_t toRemove = map->size() - upTo;
+
+  auto beginIt = map->begin();
+  auto endIt = beginIt;
+
+  if (map->size() >= toRemove) {
+    std::advance(endIt, toRemove);
+    map->erase(beginIt, endIt);
+    return toRemove;
+  }
+  else {
+    map->clear();
+    return map->size();
+  }
 };
 
 bool CopyCachingRedisClient::getValue(const std::string& key, std::string& value)
