@@ -1854,7 +1854,7 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
       if (redis.result_cache_enabled) {
         resultCache = std::make_shared<BasicCache<std::string, std::string>>();
       }
-      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), redis.copy_cache_enabled, resultCache));
+      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache));
       dnsdist::configuration::yaml::registerType<KeyValueStore>(store, redis.name);
     }
     else {
