@@ -211,15 +211,15 @@ dnsdist_SOURCES = \
 	dnsdist-kvs.hh dnsdist-kvs.cc \
 	dnsdist-lbpolicies.cc dnsdist-lbpolicies.hh \
 	dnsdist-lua-actions.cc \
+	dnsdist-lua-bindings-cache.cc \
 	dnsdist-lua-bindings-dnscrypt.cc \
 	dnsdist-lua-bindings-dnsparser.cc \
 	dnsdist-lua-bindings-dnsquestion.cc \
-	dnsdist-lua-bindings-cache.cc \
 	dnsdist-lua-bindings-kvs.cc \
-	dnsdist-lua-bindings-redis.cc \
 	dnsdist-lua-bindings-network.cc \
 	dnsdist-lua-bindings-packetcache.cc \
 	dnsdist-lua-bindings-protobuf.cc \
+	dnsdist-lua-bindings-redis.cc \
 	dnsdist-lua-bindings-rings.cc \
 	dnsdist-lua-bindings.cc \
 	dnsdist-lua-configuration-items.cc \
@@ -281,7 +281,7 @@ dnsdist_SOURCES = \
 	ext/libbpf/libbpf.h \
 	ext/luawrapper/include/LuaContext.hpp \
 	fstrm_logger.cc fstrm_logger.hh \
-	generic-cache.hh generic-cache.cc \
+	generic-cache.cc generic-cache.hh \
 	gettime.cc gettime.hh \
 	htmlfiles.h \
 	iputils.cc iputils.hh \
