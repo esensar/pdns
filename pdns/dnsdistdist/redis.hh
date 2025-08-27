@@ -21,6 +21,7 @@
  */
 #pragma once
 
+#include "dolog.hh"
 #include "generic-cache.hh"
 #include "iputils.hh"
 #include "channel.hh"
@@ -518,6 +519,10 @@ private:
 class CopyCache : public GenericCacheInterface<std::string, std::string>
 {
 public:
+  CopyCache(unsigned int ttlMs) :
+    d_ttlMs(ttlMs)
+  {
+  }
   void insert(const std::string& key, std::string value) override;
   bool getValue(const std::string& key, std::string& value) const override;
   bool contains(const std::string& key) const override;
@@ -530,15 +535,17 @@ public:
 private:
   // Mutable to be able to lock in const methods
   mutable SharedLockGuarded<std::unordered_map<std::string, std::string>> d_map{};
+  const unsigned int d_ttlMs;
+  mutable unsigned int d_lastInsertMs;
 };
 
 class CopyCachingRedisClient : public RedisKVClientInterface
 {
 public:
-  CopyCachingRedisClient(std::unique_ptr<RedisKVClientInterface> client) :
+  CopyCachingRedisClient(std::unique_ptr<RedisKVClientInterface> client, unsigned int cacheTtlMs) :
     d_client(std::move(client))
   {
-    d_copyCache = std::make_shared<CopyCache>();
+    d_copyCache = std::make_shared<CopyCache>(cacheTtlMs);
   }
 
   bool getValue(const std::string& key, std::string& value) override;
