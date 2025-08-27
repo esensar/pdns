@@ -344,6 +344,10 @@ redis_kv_store:
       type: "bool"
       default: "true"
       description: "Whether the result cache should be enabled for this redis KV store"
+    - name: "negative_cache_enabled"
+      type: "bool"
+      default: "true"
+      description: "Whether the negative result cache should be enabled for this redis KV store"
 
 kvs_lookup_key_source_ip:
   description: "Lookup key that can be used with :ref:`yaml-settings-KeyValueStoreLookupAction` or :ref:`yaml-settings-KeyValueStoreLookupSelector`, will return the source IP of the client in network byte-order"

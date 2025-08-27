@@ -50,18 +50,20 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     }
 
     std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache;
+    std::shared_ptr<GenericCacheInterface<std::string, std::string>> negativeCache;
     bool copyCacheEnabled{false};
     unsigned int copyCacheTtlMs;
     boost::optional<std::string> lookupAction;
     boost::optional<std::string> dataName;
     getOptionalValue<std::shared_ptr<GenericCacheInterface<std::string, std::string>>>(vars, "resultCache", resultCache);
+    getOptionalValue<std::shared_ptr<GenericCacheInterface<std::string, std::string>>>(vars, "negativeCache", negativeCache);
     getOptionalValue<bool>(vars, "copyCacheEnabled", copyCacheEnabled);
     getOptionalIntegerValue<unsigned int>("newRedisKVStore", vars, "copyCacheTtlMs", copyCacheTtlMs);
     getOptionalValue<std::string>(vars, "dataName", dataName);
     getOptionalValue<std::string>(vars, "lookupAction", lookupAction);
 
     checkAllParametersConsumed("newRedisKVStore", vars);
-    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisClient, lookupAction, dataName, copyCacheEnabled, copyCacheTtlMs, resultCache));
+    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisClient, lookupAction, dataName, copyCacheEnabled, copyCacheTtlMs, resultCache, negativeCache));
   });
 #endif /* HAVE_REDIS */
 
