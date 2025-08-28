@@ -306,6 +306,9 @@ cdb_kv_store:
     - name: "file_name"
       type: "String"
       description: "The path to an existing CDB database"
+    - name: "refresh_delay"
+      type: "u32"
+      description: "The delay in seconds between two checks of the database modification time. 0 means disabled"
 
 redis_kv_store:
   description: "Redis-based key-value store"
