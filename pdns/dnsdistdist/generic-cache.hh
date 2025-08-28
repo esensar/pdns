@@ -41,6 +41,7 @@ template <typename K, typename V>
 class GenericCacheInterface
 {
 public:
+  virtual ~GenericCacheInterface() {};
   virtual void insert(const K& key, V value) = 0;
   virtual bool getValue(const K& key, V& value) = 0;
   virtual bool contains(const K& key) = 0;
@@ -76,6 +77,7 @@ public:
     d_settings(settings), d_shards(settings.d_shardCount)
   {
   }
+  virtual ~GenericCache() {};
 
   void insert(const K& key, V value)
   {
