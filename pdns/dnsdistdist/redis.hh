@@ -209,7 +209,11 @@ public:
   }
   bool ok() const override
   {
+#if HIREDIS_MAJOR > 0
     return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements == 2 && d_reply->element[0]->type == REDIS_REPLY_BIGNUM;
+#else
+    return d_reply && d_reply->type == REDIS_REPLY_ARRAY && d_reply->elements == 2;
+#endif
   }
   bool getValue() const override
   {
