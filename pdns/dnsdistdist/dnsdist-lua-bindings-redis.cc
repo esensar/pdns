@@ -29,7 +29,7 @@
 void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] bool client)
 {
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, boost::optional<LuaAssociativeTable<boost::variant<bool, int>>> vars) {
+  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
     if (client) {
       return std::shared_ptr<RedisClient>(nullptr);
     }
@@ -37,7 +37,7 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     bool pipelineEnabled{true};
     int pipelineInterval{10};
     getOptionalValue<bool>(vars, "pipelineEnabled", pipelineEnabled);
-    getOptionalValue<int>(vars, "pipelineInterval", pipelineInterval);
+    getOptionalIntegerValue<int>("newRedisClient", vars, "pipelineInterval", pipelineInterval);
     checkAllParametersConsumed("newRedisClient", vars);
 
     return std::make_shared<RedisClient>(url, pipelineEnabled, pipelineInterval);

@@ -95,7 +95,7 @@ std::unordered_map<std::string, std::string> RedisGetLookupAction::generateCopyC
   return {};
 }
 
-bool RedisGetLookupAction::getFromCopyCache([[maybe_unused]] const GenericCacheInterface<std::string, std::string>& cache, [[maybe_unused]] const std::string& key, [[maybe_unused]] std::string& value) const
+bool RedisGetLookupAction::getFromCopyCache([[maybe_unused]] GenericCacheInterface<std::string, std::string>& cache, [[maybe_unused]] const std::string& key, [[maybe_unused]] std::string& value) const
 {
   return false;
 }
@@ -115,7 +115,7 @@ std::unordered_map<std::string, std::string> RedisHGetLookupAction::generateCopy
   return d_getAllCommand(client, d_hash_key)->getValue();
 }
 
-bool RedisHGetLookupAction::getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const
+bool RedisHGetLookupAction::getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const
 {
   return cache.getValue(key, value);
 }
@@ -140,7 +140,7 @@ std::unordered_map<std::string, std::string> RedisSismemberLookupAction::generat
   return result;
 }
 
-bool RedisSismemberLookupAction::getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const
+bool RedisSismemberLookupAction::getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const
 {
   if (cache.contains(key)) {
     value = "1";
@@ -170,7 +170,7 @@ std::unordered_map<std::string, std::string> RedisSscanLookupAction::generateCop
   return result;
 }
 
-bool RedisSscanLookupAction::getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const
+bool RedisSscanLookupAction::getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const
 {
   if (cache.contains(key)) {
     value = "1";
@@ -348,7 +348,7 @@ void CopyCache::insert(const std::string& key, std::string value)
   map->emplace(key, value);
 };
 
-bool CopyCache::getValue(const std::string& key, std::string& value) const
+bool CopyCache::getValue(const std::string& key, std::string& value)
 {
   if (needsUpdate()) {
     return false;
@@ -365,13 +365,13 @@ bool CopyCache::getValue(const std::string& key, std::string& value) const
   return false;
 };
 
-bool CopyCache::contains(const std::string& key) const
+bool CopyCache::contains(const std::string& key)
 {
   auto map = d_map.read_lock();
   return map->find(key) != map->end();
 };
 
-bool CopyCache::needsUpdate() const
+bool CopyCache::needsUpdate()
 {
   struct timespec now;
   gettime(&now);
@@ -379,7 +379,7 @@ bool CopyCache::needsUpdate() const
   return d_lastInsertMs + d_ttlMs < nowMs;
 };
 
-void CopyCache::insertBatch(std::unordered_map<std::string, std::string> batch) const
+void CopyCache::insertBatch(std::unordered_map<std::string, std::string> batch)
 {
   auto map = d_map.write_lock();
 
