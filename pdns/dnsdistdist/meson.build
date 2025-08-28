@@ -201,7 +201,6 @@ common_sources += files(
   src_dir / 'ednsextendederror.cc',
   src_dir / 'ednsoptions.cc',
   src_dir / 'ednssubnet.cc',
-  src_dir / 'generic-cache.cc',
   src_dir / 'gettime.cc',
   src_dir / 'iputils.cc',
   src_dir / 'libssl.cc',

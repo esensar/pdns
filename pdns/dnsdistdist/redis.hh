@@ -323,7 +323,7 @@ public:
   {
     return d_cacheId;
   }
-  virtual bool getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const = 0;
+  virtual bool getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const = 0;
   virtual std::unique_ptr<RedisReplyInterface<std::string>> getValue(const RedisClient& client, const std::string& key) const = 0;
   virtual std::unordered_map<std::string, std::string> generateCopyCache(const RedisClient& client) const = 0;
   virtual std::unique_ptr<RedisReplyInterface<bool>> keyExists(const RedisClient& client, const std::string& key) const = 0;
@@ -339,7 +339,7 @@ public:
     RedisLookupAction("KEY_" + prefix), d_prefix(prefix)
   {
   }
-  bool getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
+  bool getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReplyInterface<std::string>> getValue(const RedisClient& client, const std::string& key) const override;
   std::unordered_map<std::string, std::string> generateCopyCache(const RedisClient& client) const override;
   std::unique_ptr<RedisReplyInterface<bool>> keyExists(const RedisClient& client, const std::string& key) const override;
@@ -357,7 +357,7 @@ public:
     RedisLookupAction("HGET_" + hash_key), d_hash_key(hash_key)
   {
   }
-  bool getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
+  bool getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReplyInterface<std::string>> getValue(const RedisClient& client, const std::string& key) const override;
   std::unordered_map<std::string, std::string> generateCopyCache(const RedisClient& client) const override;
   std::unique_ptr<RedisReplyInterface<bool>> keyExists(const RedisClient& client, const std::string& key) const override;
@@ -376,7 +376,7 @@ public:
     RedisLookupAction("SISMEMBER_" + set_key), d_set_key(set_key)
   {
   }
-  bool getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
+  bool getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReplyInterface<std::string>> getValue(const RedisClient& client, const std::string& key) const override;
   std::unordered_map<std::string, std::string> generateCopyCache(const RedisClient& client) const override;
   std::unique_ptr<RedisReplyInterface<bool>> keyExists(const RedisClient& client, const std::string& key) const override;
@@ -394,7 +394,7 @@ public:
     RedisLookupAction("SISMEMBER_" + set_key), d_set_key(set_key)
   {
   }
-  bool getFromCopyCache(const GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
+  bool getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const override;
   std::unique_ptr<RedisReplyInterface<std::string>> getValue(const RedisClient& client, const std::string& key) const override;
   std::unordered_map<std::string, std::string> generateCopyCache(const RedisClient& client) const override;
   std::unique_ptr<RedisReplyInterface<bool>> keyExists(const RedisClient& client, const std::string& key) const override;
@@ -541,19 +541,18 @@ public:
   {
   }
   void insert(const std::string& key, std::string value) override;
-  bool getValue(const std::string& key, std::string& value) const override;
-  bool contains(const std::string& key) const override;
+  bool getValue(const std::string& key, std::string& value) override;
+  bool contains(const std::string& key) override;
   size_t purgeExpired(size_t upTo, const time_t now) override;
   size_t expunge(size_t upTo = 0) override;
 
-  bool needsUpdate() const;
-  void insertBatch(std::unordered_map<std::string, std::string> batch) const;
+  bool needsUpdate();
+  void insertBatch(std::unordered_map<std::string, std::string> batch);
 
 private:
-  // Mutable to be able to lock in const methods
-  mutable SharedLockGuarded<std::unordered_map<std::string, std::string>> d_map{};
+  SharedLockGuarded<std::unordered_map<std::string, std::string>> d_map{};
   const unsigned int d_ttlMs;
-  mutable unsigned int d_lastInsertMs;
+  unsigned int d_lastInsertMs;
 };
 
 class CopyCachingRedisClient : public RedisKVClientInterface

@@ -281,7 +281,7 @@ dnsdist_SOURCES = \
 	ext/libbpf/libbpf.h \
 	ext/luawrapper/include/LuaContext.hpp \
 	fstrm_logger.cc fstrm_logger.hh \
-	generic-cache.cc generic-cache.hh \
+	generic-cache.hh \
 	gettime.cc gettime.hh \
 	htmlfiles.h \
 	iputils.cc iputils.hh \
@@ -385,7 +385,7 @@ testrunner_SOURCES = \
 	ednsoptions.cc ednsoptions.hh \
 	ednssubnet.cc ednssubnet.hh \
 	ext/luawrapper/include/LuaContext.hpp \
-	generic-cache.hh generic-cache.cc \
+	generic-cache.hh \
 	gettime.cc gettime.hh \
 	iputils.cc iputils.hh \
 	misc.cc misc.hh \
