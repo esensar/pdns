@@ -28,31 +28,19 @@ using cache_t = GenericCacheInterface<std::string, std::string>;
 
 void setupLuaBindingsCache(LuaContext& luaCtx)
 {
-  luaCtx.writeFunction("newBasicCache", [](boost::optional<LuaAssociativeTable<boost::variant<std::string>>> vars) {
+  luaCtx.writeFunction("newObjectCache", [](boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
     unsigned int shardCount{1};
-    getOptionalIntegerValue<unsigned int>("newBasicCache", vars, "shardCount", shardCount);
-
-    return std::shared_ptr<cache_t>(new GenericCache<std::string, std::string, false, false>({.d_ttl = 0, .d_shardCount = shardCount}));
-  });
-
-  luaCtx.writeFunction("newTtlCache", [](boost::optional<LuaAssociativeTable<boost::variant<std::string>>> vars) {
     unsigned int ttl{100};
-    unsigned int shardCount{1};
-    getOptionalIntegerValue<unsigned int>("newTtlCache", vars, "ttl", ttl);
-    getOptionalIntegerValue<unsigned int>("newTtlCache", vars, "shardCount", shardCount);
-
-    return std::shared_ptr<cache_t>(new GenericCache<std::string, std::string, true, false>({.d_ttl = ttl, .d_shardCount = shardCount}));
-  });
-
-  luaCtx.writeFunction("newLruCache", [](boost::optional<LuaAssociativeTable<boost::variant<std::string>>> vars) {
     unsigned int maxEntries{100};
-    unsigned int shardCount{1};
-    getOptionalIntegerValue<unsigned int>("newLruCache", vars, "maxEntries", maxEntries);
-    getOptionalIntegerValue<unsigned int>("newLruCache", vars, "shardCount", shardCount);
+    bool ttlEnabled{false};
+    bool lruEnabled{false};
+    getOptionalValue<bool>(vars, "ttlEnabled", ttlEnabled);
+    getOptionalValue<bool>(vars, "lruEnabled", lruEnabled);
+    getOptionalIntegerValue<unsigned int>("newObjectCache", vars, "shardCount", shardCount);
+    getOptionalIntegerValue<unsigned int>("newObjectCache", vars, "maxEntries", maxEntries);
+    getOptionalIntegerValue<unsigned int>("newObjectCache", vars, "ttl", ttl);
 
-    return std::shared_ptr<cache_t>(new GenericCache<std::string, std::string, false, true>({.d_ttl = 0,
-                                                                                             .d_shardCount = shardCount,
-                                                                                             .d_maxEntries = maxEntries}));
+    return std::shared_ptr<cache_t>(new GenericCache<std::string, std::string>({.d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_lruEnabled = lruEnabled, .d_shardCount = shardCount, .d_maxEntries = maxEntries}));
   });
 
   luaCtx.registerFunction<boost::optional<std::string> (std::shared_ptr<cache_t>::*)(const std::string&)>("get", [](std::shared_ptr<cache_t>& cache, const std::string& key) {
@@ -83,6 +71,14 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     }
 
     cache->insert(key, value);
+  });
+
+  luaCtx.registerFunction<void (std::shared_ptr<cache_t>::*)(const std::string&)>("insertKey", [](std::shared_ptr<cache_t>& cache, const std::string& key) {
+    if (!cache) {
+      return;
+    }
+
+    cache->insertKey(key);
   });
 
   luaCtx.registerFunction<void (std::shared_ptr<cache_t>::*)(const int&)>("purgeExpired", [](std::shared_ptr<cache_t>& cache, const int& upTo) {

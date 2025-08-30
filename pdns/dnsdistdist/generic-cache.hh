@@ -23,52 +23,62 @@
 
 #include <atomic>
 #include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/indexed_by.hpp>
-#include <boost/multi_index/member.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index/key_extractors.hpp>
-#include <boost/multi_index/tag.hpp>
+#include <stdexcept>
 #include <type_traits>
-#include <unordered_map>
 #include <vector>
 
-#include "dolog.hh"
+#include "cachecleaner.hh"
 #include "lock.hh"
 
+using namespace ::boost::multi_index;
+
+class GenericExpiringCacheInterface
+{
+public:
+  virtual ~GenericExpiringCacheInterface() {};
+  virtual size_t purgeExpired(size_t upTo, time_t now) = 0;
+  virtual size_t expunge(size_t upTo = 0) = 0;
+};
+
+template <typename K>
+class GenericFilterInterface : public GenericExpiringCacheInterface
+{
+public:
+  virtual ~GenericFilterInterface() {};
+  virtual void insertKey(const K& key) = 0;
+  virtual bool contains(const K& key) = 0;
+};
+
 template <typename K, typename V>
-class GenericCacheInterface
+class GenericCacheInterface : public GenericFilterInterface<K>
 {
 public:
   virtual ~GenericCacheInterface() {};
   virtual void insert(const K& key, V value) = 0;
   virtual bool getValue(const K& key, V& value) = 0;
-  virtual bool contains(const K& key) = 0;
-  virtual size_t purgeExpired(size_t upTo, time_t now) = 0;
-  virtual size_t expunge(size_t upTo = 0) = 0;
 };
 
-template <typename K, typename V, bool hasTtl, bool hasLru, typename Hash = std::hash<K>, typename = std::enable_if_t<!hasTtl || !hasLru>>
+template <typename K, typename V, typename Hash = std::hash<K>>
 class GenericCache : public GenericCacheInterface<K, V>, boost::noncopyable
 {
 private:
-  struct BasicCacheValue
+  struct CacheValue
   {
-    V value;
-  };
-  struct CacheValueWithTtl
-  {
+    K key;
     V value;
     time_t validity;
   };
 
-  using CacheValue = std::conditional_t<hasTtl, CacheValueWithTtl, BasicCacheValue>;
-
 public:
   struct CacheSettings
   {
+    bool d_ttlEnabled;
     unsigned int d_ttl;
+    bool d_lruEnabled;
     uint32_t d_shardCount{1};
     uint32_t d_maxEntries{0};
   };
@@ -79,36 +89,37 @@ public:
   }
   virtual ~GenericCache() {};
 
-  void insert(const K& key, V value)
+  void insert(const K& key, V value) override
   {
     size_t hash = Hash{}(key);
     size_t shardIndex = hash % d_settings.d_shardCount;
 
     if (d_settings.d_maxEntries > 0 && d_shards.at(shardIndex).d_entriesCount >= (d_settings.d_maxEntries / d_settings.d_shardCount)) {
-      if constexpr (hasTtl) {
+      if (d_settings.d_ttlEnabled) {
         time_t now = time(nullptr);
         purgeExpired(0, now);
       }
-      else {
+      if (d_settings.d_lruEnabled) {
         expunge(d_settings.d_maxEntries - 1);
-      };
+      }
 
       if (d_shards.at(shardIndex).d_entriesCount >= (d_settings.d_maxEntries / d_settings.d_shardCount)) {
         return;
       }
     }
 
-    CacheValue cacheValue;
-    if constexpr (hasTtl) {
+    time_t validity;
+    if (d_settings.d_ttlEnabled) {
       time_t now = time(nullptr);
-      cacheValue = CacheValueWithTtl{
-        .value = value,
-        .validity = now + d_settings.d_ttl};
+      validity = now + d_settings.d_ttl;
     }
     else {
-      cacheValue = BasicCacheValue{
-        .value = value};
+      validity = time_t();
     }
+    CacheValue cacheValue{
+      .key = key,
+      .value = value,
+      .validity = validity};
 
     auto& shard = d_shards.at(shardIndex);
 
@@ -119,23 +130,34 @@ public:
       return;
     }
 
-    typename std::unordered_map<K, CacheValue, Hash>::iterator mapIt;
-    bool result{false};
-    std::tie(mapIt, result) = map->insert({key, cacheValue});
+    auto result = map->insert(cacheValue);
 
-    if (result) {
-      ++shard.d_entriesCount;
-      return;
+    // TODO memory usage calculation here?
+    if (!result.second) {
+      if (map->replace(result.first, cacheValue)) {
+        ++shard.d_entriesCount;
+      }
     }
-
-    // Replace old value
-    mapIt->second.value = value;
+    else {
+      ++shard.d_entriesCount;
+    }
   }
 
-  bool getValue(const K& key, V& value)
+  void insertKey(const K& key) override
+  {
+    if constexpr (std::is_default_constructible<V>()) {
+      insert(key, V());
+    }
+    else {
+      throw new std::runtime_error("Unsupported insertKey operation.");
+    }
+  }
+
+  bool getValue(const K& key, V& value) override
   {
     size_t hash = Hash{}(key);
     size_t shardIndex = hash % d_settings.d_shardCount;
+    auto result = false;
     auto& shard = d_shards.at(shardIndex);
     {
       auto map = shard.d_map.read_lock();
@@ -144,60 +166,83 @@ public:
       if (mapIt == map->end()) {
         return false;
       }
+
+      if (d_settings.d_ttlEnabled) {
+        time_t now = time(nullptr);
+        if (mapIt->validity > now) {
+          value = mapIt->value;
+          result = true;
+        }
+      }
       else {
-        if constexpr (hasTtl) {
-          time_t now = time(nullptr);
-          if (mapIt->second.validity > now) {
-            value = mapIt->second.value;
-            return true;
-          }
-        }
-        else {
-          value = mapIt->second.value;
-          return true;
-        }
+        value = mapIt->value;
+        result = true;
       }
     }
 
-    if constexpr (hasTtl) {
-      erase_key(shard, key);
-      return false;
+    if (d_settings.d_lruEnabled || (!result && d_settings.d_ttlEnabled)) {
+      auto map = shard.d_map.write_lock();
+      auto mapIt = map->find(key);
+      if (mapIt == map->end()) {
+        return result;
+      }
+      if (d_settings.d_lruEnabled) {
+        moveCacheItemToBack<SequencedTag>(*map, mapIt);
+      }
+      if (!result && d_settings.d_ttlEnabled) {
+        map->erase(mapIt);
+      }
     }
+
+    return result;
   }
 
-  bool contains(const K& key)
+  bool contains(const K& key) override
   {
     size_t hash = Hash{}(key);
     size_t shardIndex = hash % d_settings.d_shardCount;
+    auto result = false;
     auto& shard = d_shards.at(shardIndex);
     {
       auto map = shard.d_map.read_lock();
 
       auto mapIt = map->find(key);
-      if constexpr (hasTtl) {
-        if (mapIt == map->end()) {
-          return false;
-        }
 
+      if (mapIt == map->end()) {
+        return false;
+      }
+
+      if (d_settings.d_ttlEnabled) {
         time_t now = time(nullptr);
-        if (mapIt->second.validity > now) {
-          return true;
+        if (mapIt->validity > now) {
+          result = true;
         }
       }
       else {
-        return mapIt != map->end();
+        result = true;
       }
     }
 
-    if constexpr (hasTtl) {
-      erase_key(shard, key);
-      return false;
+    if (d_settings.d_lruEnabled || (!result && d_settings.d_ttlEnabled)) {
+      auto map = shard.d_map.write_lock();
+      auto mapIt = map->find(key);
+      if (mapIt == map->end()) {
+        return result;
+      }
+      if (d_settings.d_lruEnabled) {
+        moveCacheItemToBack<SequencedTag>(*map, mapIt);
+      }
+      if (!result && d_settings.d_ttlEnabled) {
+        map->erase(mapIt);
+      }
     }
+
+    return result;
   }
 
-  size_t purgeExpired(size_t upTo, const time_t now)
+  size_t purgeExpired(size_t upTo, const time_t now) override
   {
-    if constexpr (hasTtl) {
+    if (d_settings.d_ttlEnabled) {
       const size_t maxPerShard = upTo / d_settings.d_shardCount;
 
       size_t removed = 0;
@@ -210,9 +255,7 @@ public:
         size_t toRemove = map->size() - maxPerShard;
 
         for (auto it = map->begin(); toRemove > 0 && it != map->end();) {
-          const CacheValue& value = it->second;
-
-          if (value.validity <= now) {
+          if (it->validity <= now) {
             it = map->erase(it);
             --toRemove;
             --shard.d_entriesCount;
@@ -231,7 +274,7 @@ public:
     }
   }
 
-  size_t expunge(size_t upTo = 0)
+  size_t expunge(size_t upTo = 0) override
   {
     const size_t maxPerShard = upTo / d_settings.d_shardCount;
 
@@ -246,12 +289,13 @@ public:
 
       size_t toRemove = map->size() - maxPerShard;
 
-      auto beginIt = map->begin();
-      auto endIt = beginIt;
-
       if (map->size() >= toRemove) {
+        auto& sequence = map->template get<SequencedTag>();
+        auto beginIt = sequence.begin();
+        auto endIt = beginIt;
+
         std::advance(endIt, toRemove);
-        map->erase(beginIt, endIt);
+        sequence.erase(beginIt, endIt);
         shard.d_entriesCount -= toRemove;
         removed += toRemove;
       }
@@ -288,18 +332,15 @@ private:
       d_map.write_lock()->reserve(maxSize);
     }
 
-    SharedLockGuarded<std::unordered_map<K, CacheValue, Hash>> d_map;
+    using cache_t = multi_index_container<
+      CacheValue,
+      indexed_by<
+        hashed_unique<tag<HashedTag>, member<CacheValue, K, &CacheValue::key>, Hash>,
+        sequenced<tag<SequencedTag>>>>;
+
+    SharedLockGuarded<cache_t> d_map;
     std::atomic<uint64_t> d_entriesCount{0};
   };
-
-  void erase_key(CacheShard& shard, const K& key)
-  {
-    auto map = shard.d_map.write_lock();
-    auto mapIt = map->find(key);
-    if (mapIt != map->end()) {
-      map->erase(mapIt);
-    }
-  }
 
   CacheSettings d_settings;
   std::vector<CacheShard> d_shards;

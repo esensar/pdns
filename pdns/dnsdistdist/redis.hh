@@ -523,7 +523,7 @@ private:
 class NegativeCachingRedisClient : public RedisKVClientInterface
 {
 public:
-  NegativeCachingRedisClient(std::unique_ptr<RedisKVClientInterface> client, std::shared_ptr<GenericCacheInterface<std::string, std::string>> cache) :
+  NegativeCachingRedisClient(std::unique_ptr<RedisKVClientInterface> client, std::shared_ptr<GenericFilterInterface<std::string>> cache) :
     d_client(std::move(client)), d_negativeCache(cache)
   {
   }
@@ -534,7 +534,7 @@ public:
 
 private:
   std::unique_ptr<RedisKVClientInterface> d_client;
-  std::shared_ptr<GenericCacheInterface<std::string, std::string>> d_negativeCache;
+  std::shared_ptr<GenericFilterInterface<std::string>> d_negativeCache;
 };
 
 class CopyCache : public GenericCacheInterface<std::string, std::string>
@@ -545,6 +545,7 @@ public:
   {
   }
   void insert(const std::string& key, std::string value) override;
+  void insertKey(const std::string& key) override;
   bool getValue(const std::string& key, std::string& value) override;
   bool contains(const std::string& key) override;
   size_t purgeExpired(size_t upTo, const time_t now) override;

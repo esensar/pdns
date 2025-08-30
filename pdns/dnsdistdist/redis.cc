@@ -22,6 +22,7 @@
 #include "gettime.hh"
 #include "threadname.hh"
 #include <condition_variable>
+#include <stdexcept>
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -319,7 +320,7 @@ bool NegativeCachingRedisClient::getValue(const std::string& key, std::string& v
 
   auto found = d_client->getValue(key, value);
   if (!found) {
-    d_negativeCache->insert(key, "");
+    d_negativeCache->insertKey(key);
   }
   return found;
 }
@@ -337,7 +338,7 @@ bool NegativeCachingRedisClient::keyExists(const std::string& key)
 
   auto found = d_client->keyExists(key);
   if (!found) {
-    d_negativeCache->insert(key, "");
+    d_negativeCache->insertKey(key);
   }
   return found;
 }
@@ -346,6 +347,11 @@ void CopyCache::insert(const std::string& key, std::string value)
 {
   auto map = d_map.write_lock();
   map->emplace(key, value);
+};
+
+void CopyCache::insertKey([[maybe_unused]] const std::string& key)
+{
+  throw std::runtime_error("Unsupported insertKey operation for copy cache.");
 };
 
 bool CopyCache::getValue(const std::string& key, std::string& value)
