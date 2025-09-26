@@ -103,6 +103,7 @@ subdir('ext' / 'json11')
 subdir('ext' / 'luawrapper')
 subdir('ext' / 'protozero')
 subdir('ext' / 'yahttp')
+subdir('ext' / 'probds')
 
 if dep_lmdb.found()
   subdir('ext' / 'lmdb-safe')
@@ -480,6 +481,7 @@ tools = {
     'deps-extra': [
       dep_boost,
       dep_pdns,
+      dep_probds,
       dep_ffi_interface,
       dep_lua,
       dep_protozero,

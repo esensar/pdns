@@ -16,6 +16,7 @@ AM_CPPFLAGS += $(SYSTEMD_CFLAGS) \
 	-DBOOST_CONTAINER_USE_STD_EXCEPTIONS
 
 DNSDIST_RUST_LIBS = $(top_builddir)/dnsdist-rust-lib/rust/libdnsdist_rust.a $(LIBDL)
+PROBDS_LIBS = $(top_builddir)/ext/probds/libprobds.la
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -24,6 +25,7 @@ SUBDIRS=dnsdist-rust-lib \
 	ext/arc4random \
 	ext/ipcrypt \
 	ext/ipcrypt2 \
+	ext/probds \
 	ext/yahttp
 
 CLEANFILES = \
@@ -304,6 +306,7 @@ dnsdist_SOURCES = \
 	sholder.hh \
 	snmp-agent.cc snmp-agent.hh \
 	sstuff.hh \
+	stable-bloom.hh \
 	stat_t.hh \
 	statnode.cc statnode.hh \
 	svc-records.cc svc-records.hh \
@@ -399,6 +402,7 @@ testrunner_SOURCES = \
 	qtype.cc qtype.hh \
 	sholder.hh \
 	sstuff.hh \
+	stable-bloom.hh \
 	stat_t.hh \
 	statnode.cc statnode.hh \
 	svc-records.cc svc-records.hh \
@@ -452,6 +456,7 @@ dnsdist_LDADD = \
 	$(LIBEDIT_LIBS) \
 	$(RT_LIBS) \
 	$(YAHTTP_LIBS) \
+	$(PROBDS_LIBS) \
 	$(LIBSODIUM_LIBS) \
 	$(FSTRM_LIBS) \
 	$(SYSTEMD_LIBS) \
