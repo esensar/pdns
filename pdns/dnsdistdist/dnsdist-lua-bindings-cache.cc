@@ -45,11 +45,15 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     return std::shared_ptr<cache_t>(new GenericCache<std::string, std::string>({.d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_lruEnabled = lruEnabled, .d_shardCount = shardCount, .d_maxEntries = maxEntries, .d_lruDeleteUpTo = lruDeleteUpTo}));
   });
 
-  luaCtx.writeFunction("newBloomFilter", [](boost::optional<LuaAssociativeTable<boost::variant<std::string>>> vars) {
+  luaCtx.writeFunction("newBloomFilter", [](boost::optional<LuaAssociativeTable<boost::variant<std::string, float>>> vars) {
     unsigned int maxEntries{67108864};
+    float fpRate{0.01};
+    unsigned int numDec{10};
     getOptionalIntegerValue<unsigned int>("newBloomFilter", vars, "maxEntries", maxEntries);
+    getOptionalIntegerValue<unsigned int>("newBloomFilter", vars, "numDec", numDec);
+    getOptionalValue<float>(vars, "fpRate", fpRate);
 
-    return std::shared_ptr<cache_t>(new BloomFilter({.d_numCells = maxEntries}));
+    return std::shared_ptr<cache_t>(new BloomFilter({.d_fpRate = fpRate, .d_numCells = maxEntries, .d_numDec = numDec}));
   });
 
   luaCtx.writeFunction("newCuckooFilter", [](boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
