@@ -55,11 +55,15 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
   luaCtx.writeFunction("newCuckooFilter", [](boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
     unsigned int maxEntries{100000};
     unsigned int maxKicks{500};
+    unsigned int bucketSize{4};
+    unsigned int fingerprintBits{8};
     bool lruEnabled{false};
     bool ttlEnabled{false};
     unsigned int ttl{100};
     getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "maxEntries", maxEntries);
     getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "maxKicks", maxKicks);
+    getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "bucketSize", bucketSize);
+    getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "fingerprintBits", fingerprintBits);
     getOptionalValue<bool>(vars, "ttlEnabled", ttlEnabled);
     getOptionalValue<bool>(vars, "lruEnabled", lruEnabled);
     getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "ttl", ttl);
