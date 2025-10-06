@@ -21,6 +21,7 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <boost/dynamic_bitset.hpp>
 #include <boost/multi_index/hashed_index.hpp>
@@ -415,7 +416,6 @@ private:
 
 class CuckooFilter : public GenericCacheInterface<std::string, std::string>
 {
-  static constexpr size_t BUCKET_SIZE = 4;
   static constexpr size_t FINGERPRINT_BITS = 8;
 
 public:
@@ -423,14 +423,20 @@ public:
   {
     unsigned int d_maxKicks{500};
     uint32_t d_maxEntries{100000};
+    uint32_t d_bucketSize{4};
+    uint32_t d_fingerprintBits{8};
     bool d_ttlEnabled;
     unsigned int d_ttl;
     bool d_lruEnabled;
   };
 
   CuckooFilter(CuckooSettings settings) :
-    d_settings(settings), d_numBuckets(getBucketCount(settings.d_maxEntries)), d_numBucketsMask(d_numBuckets - 1), d_buckets(d_numBuckets)
+    d_settings(settings), d_numBuckets(getBucketCount(settings.d_maxEntries, settings.d_bucketSize)), d_numBucketsMask(d_numBuckets - 1)
   {
+    d_buckets.reserve(d_numBuckets);
+    for (size_t i = 0; i < d_numBuckets; ++i) {
+      d_buckets.emplace_back(settings.d_bucketSize);
+    }
   }
 
   virtual ~CuckooFilter() {};
@@ -510,9 +516,9 @@ private:
   static constexpr Fingerprint EMPTY_FINGERPRINT = 0;
   static constexpr Fingerprint FINGERPRINT_MASK = (1 << FINGERPRINT_BITS) - 1;
 
-  static size_t getBucketCount(size_t maxEntries)
+  static size_t getBucketCount(size_t maxEntries, size_t bucketSize)
   {
-    size_t bucketCount = (maxEntries + BUCKET_SIZE - 1) / BUCKET_SIZE;
+    size_t bucketCount = (maxEntries + bucketSize - 1) / bucketSize;
 
     size_t numBuckets = 1;
     while (numBuckets < bucketCount) {
@@ -523,22 +529,39 @@ private:
 
   struct Bucket
   {
-    std::atomic<Fingerprint> fingerprints[BUCKET_SIZE];
-    std::atomic<uint8_t> counters[BUCKET_SIZE];
+    std::vector<std::atomic<Fingerprint>> fingerprints;
+    std::vector<std::atomic<uint8_t>> counters;
     mutable std::shared_mutex mutex; // Fine-grained locking per bucket
 
-    Bucket()
+    Bucket(size_t bucketSize) :
+      fingerprints(bucketSize), counters(bucketSize)
     {
-      for (size_t i = 0; i < BUCKET_SIZE; ++i) {
+      for (size_t i = 0; i < bucketSize; ++i) {
         fingerprints[i].store(EMPTY_FINGERPRINT, std::memory_order_relaxed);
         counters[i].store(0, std::memory_order_relaxed);
       }
     }
 
+    Bucket(const Bucket&) = delete;
+    Bucket& operator=(const Bucket&) = delete;
+
+    Bucket(Bucket&& other) :
+      fingerprints(std::move(other.fingerprints)), counters(std::move(other.counters)), mutex()
+    {
+    }
+
+    Bucket& operator=(Bucket&& other)
+    {
+      std::unique_lock<std::shared_mutex> lock(mutex);
+      fingerprints = std::move(other.fingerprints);
+      counters = std::move(other.counters);
+      return *this;
+    }
+
     // Try to insert without lock (optimistic)
     bool try_insert_optimistic(Fingerprint fp)
     {
-      for (size_t i = 0; i < BUCKET_SIZE; ++i) {
+      for (size_t i = 0; i < fingerprints.size(); ++i) {
         Fingerprint expected = EMPTY_FINGERPRINT;
         if (fingerprints[i].compare_exchange_weak(expected, fp,
                                                   std::memory_order_acq_rel, std::memory_order_acquire)) {
@@ -553,7 +576,7 @@ private:
     bool insert_with_lock(Fingerprint fp)
     {
       std::unique_lock<std::shared_mutex> lock(mutex);
-      for (size_t i = 0; i < BUCKET_SIZE; ++i) {
+      for (size_t i = 0; i < fingerprints.size(); ++i) {
         if (fingerprints[i].load(std::memory_order_acquire) == EMPTY_FINGERPRINT) {
           fingerprints[i].store(fp, std::memory_order_release);
           counters[i].store(1, std::memory_order_release);
@@ -567,7 +590,7 @@ private:
     bool contains(Fingerprint fp)
     {
       // First try optimistic read
-      for (size_t i = 0; i < BUCKET_SIZE; ++i) {
+      for (size_t i = 0; i < fingerprints.size(); ++i) {
         if (fingerprints[i].load(std::memory_order_acquire) == fp) {
           counters[i].fetch_add(1, std::memory_order_relaxed);
           return true;
@@ -580,7 +603,7 @@ private:
     bool remove(Fingerprint fp)
     {
       std::unique_lock<std::shared_mutex> lock(mutex);
-      for (size_t i = 0; i < BUCKET_SIZE; ++i) {
+      for (size_t i = 0; i < fingerprints.size(); ++i) {
         if (fingerprints[i].load(std::memory_order_acquire) == fp) {
           fingerprints[i].store(EMPTY_FINGERPRINT, std::memory_order_release);
           counters[i].store(0, std::memory_order_release);
@@ -594,7 +617,7 @@ private:
     Fingerprint kick_random(Fingerprint new_fp, std::mt19937& rng)
     {
       std::unique_lock<std::shared_mutex> lock(mutex);
-      size_t pos = rng() % BUCKET_SIZE;
+      size_t pos = rng() % fingerprints.size();
       Fingerprint old_fp = fingerprints[pos].exchange(new_fp, std::memory_order_acq_rel);
       return old_fp;
     }
@@ -604,14 +627,14 @@ private:
     {
       std::unique_lock<std::shared_mutex> lock(mutex);
       uint8_t min = newCounter;
-      size_t pos = BUCKET_SIZE;
-      for (size_t i = 0; i < BUCKET_SIZE; ++i) {
+      size_t pos = fingerprints.size();
+      for (size_t i = 0; i < fingerprints.size(); ++i) {
         uint8_t current = counters[i].load(std::memory_order_acquire);
         if (current < min) {
           pos = i;
         }
       }
-      if (pos < BUCKET_SIZE) {
+      if (pos < fingerprints.size()) {
         counter = counters[pos].exchange(newCounter, std::memory_order_acq_rel);
       }
       else {
