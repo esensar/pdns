@@ -426,7 +426,7 @@ public:
     uint32_t d_bucketSize{4};
     uint32_t d_fingerprintBits{8};
     bool d_ttlEnabled;
-    unsigned int d_ttl;
+    uint32_t d_ttl;
     bool d_lruEnabled;
   };
 
@@ -442,7 +442,7 @@ public:
     }
 
     for (size_t i = 0; i < d_numBuckets; ++i) {
-      *d_buckets[i].lock() = Bucket(d_settings.d_bucketSize, d_settings.d_fingerprintBits);
+      *d_buckets[i].lock() = Bucket(d_settings.d_bucketSize, d_settings.d_fingerprintBits, d_settings.d_ttl);
     }
   }
 
@@ -451,8 +451,10 @@ public:
   void insertKey(const std::string& key) override
   {
     auto [i1, i2, fp] = get_indices_and_fingerprint(key);
+    timespec now;
+    gettime(&now);
 
-    if (d_buckets[i1].lock()->insert(fp) || d_buckets[i2].lock()->insert(fp)) {
+    if (d_buckets[i1].lock()->insert(fp, now) || d_buckets[i2].lock()->insert(fp, now)) {
       return;
     }
 
@@ -460,10 +462,11 @@ public:
     size_t cur_index = i1;
     Fingerprint cur_fp = fp;
     uint8_t cur_counter = 0;
+    uint32_t cur_expiry = now.tv_sec + d_settings.d_ttl;
 
     for (size_t kick = 0; kick < d_settings.d_maxKicks; ++kick) {
       if (d_settings.d_lruEnabled) {
-        bool kicked = d_buckets[cur_index].lock()->kick_lru(cur_fp, cur_fp, cur_counter, cur_counter);
+        bool kicked = d_buckets[cur_index].lock()->kick_lru(cur_fp, cur_fp, cur_counter, cur_counter, cur_expiry, cur_expiry);
         if (!kicked) {
           return;
         }
@@ -473,7 +476,7 @@ public:
       }
       cur_index = alt_index(cur_index, cur_fp);
 
-      if (d_buckets[cur_index].lock()->insert(cur_fp) || d_buckets[cur_index].lock()->insert(cur_fp)) {
+      if (d_buckets[cur_index].lock()->insert(cur_fp, now) || d_buckets[cur_index].lock()->insert(cur_fp, now)) {
         // TODO: counter is lost here and reset to 1 - probably not good
         return;
       }
@@ -490,8 +493,10 @@ public:
   bool contains(const std::string& key) override
   {
     auto [i1, i2, fp] = get_indices_and_fingerprint(key);
+    timespec now;
+    gettime(&now);
 
-    return d_buckets[i1].lock()->contains(fp) || d_buckets[i2].lock()->contains(fp);
+    return d_buckets[i1].lock()->contains(fp, now) || d_buckets[i2].lock()->contains(fp, now);
   }
 
   bool getValue(const std::string& key, [[maybe_unused]] std::string& value) override
@@ -532,39 +537,26 @@ private:
   {
     std::vector<char> d_fingerprints;
     std::vector<uint8_t> d_counters;
+    std::vector<uint32_t> d_expiry;
+    size_t d_ttl;
     size_t d_fingerprintBits;
 
     Bucket() {}
 
-    Bucket(size_t bucketSize, size_t fingerprintBits) :
-      d_fingerprints(bucketSize * fingerprintBits / 8, 0), d_counters(bucketSize, 0), d_fingerprintBits(fingerprintBits)
+    Bucket(size_t bucketSize, size_t fingerprintBits, size_t ttl) :
+      d_fingerprints(bucketSize * fingerprintBits / 8, 0), d_counters(bucketSize, 0), d_expiry(bucketSize, 0), d_ttl(ttl), d_fingerprintBits(fingerprintBits)
     {
     }
 
-    // Bucket(const Bucket&) = delete;
-    // Bucket& operator=(const Bucket&) = delete;
-    //
-    // Bucket(Bucket&& other) :
-    //   fingerprints(std::move(other.fingerprints)), counters(std::move(other.counters)), mutex()
-    // {
-    // }
-    //
-    // Bucket& operator=(Bucket&& other)
-    // {
-    //   std::unique_lock<std::shared_mutex> lock(mutex);
-    //   fingerprints = std::move(other.fingerprints);
-    //   counters = std::move(other.counters);
-    //   return *this;
-    // }
-
-    bool insert(Fingerprint fp)
+    bool insert(Fingerprint fp, timespec now)
     {
       for (size_t i = 0; i < d_counters.size(); ++i) {
         Fingerprint storedFingerprint = 0;
         memcpy(&storedFingerprint, &d_fingerprints[i * d_fingerprintBits / 8], d_fingerprintBits / 8);
         if (storedFingerprint == EMPTY_FINGERPRINT) {
-          memcpy(&d_fingerprints[i], &fp, d_fingerprintBits / 8);
+          memcpy(&d_fingerprints[i * d_fingerprintBits / 8], &fp, d_fingerprintBits / 8);
           d_counters[i] = 1;
+          d_expiry[i] = now.tv_sec + d_ttl;
           return true;
         }
       }
@@ -572,15 +564,22 @@ private:
     }
 
     // Lookup with minimal locking
-    bool contains(Fingerprint fp)
+    bool contains(Fingerprint fp, timespec now)
     {
-      // First try optimistic read
       for (size_t i = 0; i < d_counters.size(); ++i) {
-        Fingerprint storedFingerprint;
+        Fingerprint storedFingerprint = 0;
         memcpy(&storedFingerprint, &d_fingerprints[i * d_fingerprintBits / 8], d_fingerprintBits / 8);
         if (storedFingerprint == fp) {
-          d_counters[i] += 1;
-          return true;
+          if (d_expiry[i] <= now.tv_sec) {
+            memcpy(&d_fingerprints[i * d_fingerprintBits / 8], &EMPTY_FINGERPRINT, d_fingerprintBits / 8);
+            d_counters[i] = 0;
+            d_expiry[i] = 0;
+            return false;
+          }
+          else {
+            d_counters[i] += 1;
+            return true;
+          }
         }
       }
       return false;
@@ -590,11 +589,12 @@ private:
     bool remove(Fingerprint fp)
     {
       for (size_t i = 0; i < d_counters.size(); ++i) {
-        Fingerprint storedFingerprint;
+        Fingerprint storedFingerprint = 0;
         memcpy(&storedFingerprint, &d_fingerprints[i * d_fingerprintBits / 8], d_fingerprintBits / 8);
         if (storedFingerprint == fp) {
           memcpy(&d_fingerprints[i * d_fingerprintBits / 8], &EMPTY_FINGERPRINT, d_fingerprintBits / 8);
           d_counters[i] = 0;
+          d_expiry[i] = 0;
           return true;
         }
       }
@@ -602,22 +602,23 @@ private:
     }
 
     // For cuckoo eviction - returns evicted fingerprint
+    // TODO: store new timer and ttl and stuff
     Fingerprint kick_random(Fingerprint new_fp, std::mt19937& rng)
     {
       size_t pos = rng() % d_counters.size();
-      Fingerprint old_fp;
+      Fingerprint old_fp = 0;
       memcpy(&old_fp, &d_fingerprints[pos * d_fingerprintBits / 8], d_fingerprintBits / 8);
       memcpy(&d_fingerprints[pos * d_fingerprintBits / 8], &new_fp, d_fingerprintBits / 8);
       return old_fp;
     }
 
     // For LRU cuckoo eviction - returns true if fingeprint was evicted - the fingeprint is stored in kicked_fp
-    bool kick_lru(Fingerprint new_fp, Fingerprint& kicked_fp, uint8_t newCounter, uint8_t& counter)
+    bool kick_lru(Fingerprint new_fp, Fingerprint& kicked_fp, uint8_t newCounter, uint8_t& counter, uint32_t newExpiry, uint32_t& expiry)
     {
       uint8_t min = newCounter;
       size_t pos = d_counters.size();
       for (size_t i = 0; i < d_counters.size(); ++i) {
-        Fingerprint storedFingerprint;
+        Fingerprint storedFingerprint = 0;
         memcpy(&storedFingerprint, &d_fingerprints[i * d_fingerprintBits / 8], d_fingerprintBits / 8);
         if (storedFingerprint < min) {
           pos = i;
@@ -625,12 +626,14 @@ private:
       }
       if (pos < d_counters.size()) {
         counter = d_counters[pos];
+        expiry = d_expiry[pos];
         d_counters[pos] = newCounter;
+        d_expiry[pos] = newExpiry;
       }
       else {
         return false;
       }
-      Fingerprint old_fp;
+      Fingerprint old_fp = 0;
       memcpy(&old_fp, &d_fingerprints[pos * d_fingerprintBits / 8], d_fingerprintBits / 8);
       memcpy(&d_fingerprints[pos * d_fingerprintBits / 8], &new_fp, d_fingerprintBits / 8);
       kicked_fp = old_fp;
