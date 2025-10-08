@@ -553,9 +553,15 @@ private:
       for (size_t i = 0; i < d_counters.size(); ++i) {
         Fingerprint storedFingerprint = 0;
         memcpy(&storedFingerprint, &d_fingerprints[i * d_fingerprintBits / 8], d_fingerprintBits / 8);
-        if (storedFingerprint == EMPTY_FINGERPRINT) {
-          memcpy(&d_fingerprints[i * d_fingerprintBits / 8], &fp, d_fingerprintBits / 8);
-          d_counters[i] = 1;
+        bool reinsert = storedFingerprint == fp;
+        if (reinsert || storedFingerprint == EMPTY_FINGERPRINT) {
+          if (!reinsert) {
+            memcpy(&d_fingerprints[i * d_fingerprintBits / 8], &fp, d_fingerprintBits / 8);
+            d_counters[i] = 1;
+          }
+          else {
+            d_counters[i] += 1;
+          }
           d_expiry[i] = now.tv_sec + d_ttl;
           return true;
         }
