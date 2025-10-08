@@ -554,7 +554,7 @@ private:
         Fingerprint storedFingerprint = 0;
         memcpy(&storedFingerprint, &d_fingerprints[i * d_fingerprintBits / 8], d_fingerprintBits / 8);
         bool reinsert = storedFingerprint == fp;
-        if (reinsert || storedFingerprint == EMPTY_FINGERPRINT) {
+        if (reinsert || storedFingerprint == EMPTY_FINGERPRINT || d_expiry[i] <= now.tv_sec) {
           if (!reinsert) {
             memcpy(&d_fingerprints[i * d_fingerprintBits / 8], &fp, d_fingerprintBits / 8);
             d_counters[i] = 1;
