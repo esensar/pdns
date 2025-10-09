@@ -578,6 +578,25 @@ private:
   std::shared_ptr<CopyCache> d_copyCache;
 };
 
+class FilteringCopyCachingRedisClient : public RedisKVClientInterface
+{
+public:
+  FilteringCopyCachingRedisClient(std::unique_ptr<RedisKVClientInterface> client, unsigned int cacheTtl, std::shared_ptr<GenericFilterInterface<std::string>> filter) :
+    d_client(std::move(client)), d_copyCacheFilter(filter), d_ttl(cacheTtl)
+  {
+  }
+
+  bool getValue(const std::string& key, std::string& value) override;
+  std::unordered_map<std::string, std::string> generateCopyCache() override;
+  bool keyExists(const std::string& key) override;
+
+private:
+  std::unique_ptr<RedisKVClientInterface> d_client;
+  std::shared_ptr<GenericFilterInterface<std::string>> d_copyCacheFilter;
+  const unsigned int d_ttl;
+  unsigned int d_lastInsert;
+};
+
 class RedisKVClient : public RedisKVClientInterface
 {
 public:
