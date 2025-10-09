@@ -452,6 +452,41 @@ bool CopyCachingRedisClient::keyExists(const std::string& key)
   return d_client->keyExists(key);
 }
 
+bool FilteringCopyCachingRedisClient::getValue(const std::string& key, std::string& value)
+{
+  struct timespec now;
+  gettime(&now);
+  bool needsUpdate = d_lastInsert + d_ttl < now.tv_sec;
+
+  if (needsUpdate) {
+    auto copyCache = d_client->generateCopyCache();
+    for (auto const& entry : copyCache) {
+      d_copyCacheFilter->insertKey(entry.first);
+    }
+  }
+
+  if (!d_copyCacheFilter->contains(key)) {
+    return false;
+  }
+
+  return d_client->getValue(key, value);
+}
+
+std::unordered_map<std::string, std::string> FilteringCopyCachingRedisClient::generateCopyCache()
+{
+  return d_client->generateCopyCache();
+}
+
+bool FilteringCopyCachingRedisClient::keyExists(const std::string& key)
+{
+  if (!d_copyCacheFilter->contains(key)) {
+    return false;
+  }
+
+  // We generally expect filters to be correct for negative cases
+  return d_client->keyExists(key);
+}
+
 bool RedisKVClient::getValue(const std::string& key, std::string& value)
 {
   auto reply = d_lookupAction->getValue(*d_client, key);
