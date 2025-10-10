@@ -433,6 +433,7 @@ public:
   CuckooFilter(CuckooSettings settings) :
     d_settings(settings), d_numBuckets(getBucketCount(settings.d_maxEntries, settings.d_bucketSize)), d_numBucketsMask(d_numBuckets - 1), d_buckets(d_numBuckets)
   {
+    // TODO: This should be handled when calculating byte count, not increase number of bits in general
     if (d_settings.d_fingerprintBits % 8 != 0) {
       d_settings.d_fingerprintBits += (8 - d_settings.d_fingerprintBits % 8);
     }
