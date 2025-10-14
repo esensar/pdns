@@ -61,6 +61,8 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     unsigned int maxKicks{500};
     unsigned int bucketSize{4};
     unsigned int fingerprintBits{8};
+    unsigned int ttlBits{8};
+    unsigned int ttlResolution{1};
     bool lruEnabled{false};
     bool ttlEnabled{false};
     unsigned int ttl{100};
@@ -71,8 +73,10 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     getOptionalValue<bool>(vars, "ttlEnabled", ttlEnabled);
     getOptionalValue<bool>(vars, "lruEnabled", lruEnabled);
     getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "ttl", ttl);
+    getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "ttlBits", ttlBits);
+    getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "ttlResolution", ttlResolution);
 
-    return std::shared_ptr<cache_t>(new CuckooFilter({.d_maxKicks = maxKicks, .d_maxEntries = maxEntries, .d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_lruEnabled = lruEnabled}));
+    return std::shared_ptr<cache_t>(new CuckooFilter({.d_maxKicks = maxKicks, .d_maxEntries = maxEntries, .d_bucketSize = bucketSize, .d_fingerprintBits = fingerprintBits, .d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_ttlBits = ttlBits, .d_ttlResolution = ttlResolution, .d_lruEnabled = lruEnabled}));
   });
 
   luaCtx.registerFunction<boost::optional<std::string> (std::shared_ptr<cache_t>::*)(const std::string&)>("get", [](std::shared_ptr<cache_t>& cache, const std::string& key) {
