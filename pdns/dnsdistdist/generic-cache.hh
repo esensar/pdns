@@ -713,33 +713,17 @@ private:
     }
   };
 
-  static constexpr uint64_t FNV_OFFSET_BASIS = 14695981039346656037ULL;
-  static constexpr uint64_t FNV_PRIME = 1099511628211ULL;
-
-  static uint64_t fnv1a_hash(const std::string& data)
-  {
-    uint64_t hash = FNV_OFFSET_BASIS;
-    const char* bytes = data.data();
-    for (size_t i = 0; i < data.length(); ++i) {
-      hash ^= bytes[i];
-      hash *= FNV_PRIME;
-    }
-    return hash;
-  }
-
   // Hash and fingerprint calculation
   std::tuple<size_t, size_t, Fingerprint> get_indices_and_fingerprint(const std::string& data) const
   {
-    uint64_t hash = fnv1a_hash(data);
     uint32_t fingerprint_raw = murmur_hash(data);
 
     Fingerprint fp = static_cast<Fingerprint>((fingerprint_raw & d_fingerprintMask));
     if (fp == EMPTY_FINGERPRINT)
       fp = 1; // Avoid empty fingerprint
 
-    uint32_t bucket = murmur_hash(std::to_string(fp), 1);
-    size_t i1 = hash & d_numBucketsMask;
-    size_t i2 = (i1 ^ (bucket & d_numBucketsMask)) & d_numBucketsMask;
+    size_t i1 = fingerprint_raw & d_numBucketsMask;
+    size_t i2 = alt_index(i1, fp);
 
     return {i1, i2, fp};
   }
