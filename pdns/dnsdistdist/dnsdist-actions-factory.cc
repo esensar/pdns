@@ -2527,7 +2527,7 @@ std::shared_ptr<DNSResponseAction> getDnstapLogResponseAction(const std::string&
 }
 #endif /* DISABLE_PROTOBUF */
 
-#if defined(HAVE_LMDB) || defined(HAVE_CDB)
+#if defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS)
 std::shared_ptr<DNSAction> getKeyValueStoreLookupAction(std::shared_ptr<KeyValueStore>& kvs, std::shared_ptr<KeyValueLookupKey>& lookupKey, const std::string& destinationTag)
 {
   return std::shared_ptr<DNSAction>(new KeyValueStoreLookupAction(kvs, lookupKey, destinationTag));
@@ -2537,7 +2537,7 @@ std::shared_ptr<DNSAction> getKeyValueStoreRangeLookupAction(std::shared_ptr<Key
 {
   return std::shared_ptr<DNSAction>(new KeyValueStoreRangeLookupAction(kvs, lookupKey, destinationTag));
 }
-#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) */
+#endif /* defined(HAVE_LMDB) || defined(HAVE_CDB) || defined(HAVE_REDIS) */
 
 std::shared_ptr<DNSAction> getHTTPStatusAction([[maybe_unused]] uint16_t status, [[maybe_unused]] PacketBuffer&& body, [[maybe_unused]] const std::string& contentType, [[maybe_unused]] const dnsdist::ResponseConfig& responseConfig)
 {
