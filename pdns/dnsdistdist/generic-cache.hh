@@ -452,12 +452,12 @@ public:
     d_fingerprintMask = (1L << d_settings.d_fingerprintBits) - 1;
     d_settings.d_fingerprintBytes = (d_settings.d_fingerprintBits + 7) / 8;
     d_settings.d_ttlBytes = (d_settings.d_ttlBits + 7) / 8;
-    d_settings.d_dataBlockSize = settings.d_fingerprintBytes;
-    if (settings.d_lruEnabled) {
+    d_settings.d_dataBlockSize = d_settings.d_fingerprintBytes;
+    if (d_settings.d_lruEnabled) {
       d_settings.d_dataBlockSize += 1;
     }
-    if (settings.d_ttlEnabled) {
-      d_settings.d_dataBlockSize += settings.d_ttlBytes;
+    if (d_settings.d_ttlEnabled) {
+      d_settings.d_dataBlockSize += d_settings.d_ttlBytes;
     }
 
     timespec now;
