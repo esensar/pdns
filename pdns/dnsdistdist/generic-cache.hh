@@ -430,6 +430,10 @@ public:
     uint32_t d_ttlBits{32};
     uint32_t d_ttlResolution{1};
     bool d_lruEnabled;
+
+    // derived fields
+    size_t d_fingerprintBytes{0};
+    size_t d_ttlBytes{0};
   };
 
   CuckooFilter(CuckooSettings settings) :
@@ -446,13 +450,13 @@ public:
     }
 
     d_fingerprintMask = (1L << d_settings.d_fingerprintBits) - 1;
-    d_fingerprintBytes = (d_settings.d_fingerprintBits + 7) / 8;
-    d_ttlBytes = (d_settings.d_ttlBits + 7) / 8;
+    d_settings.d_fingerprintBytes = (d_settings.d_fingerprintBits + 7) / 8;
+    d_settings.d_ttlBytes = (d_settings.d_ttlBits + 7) / 8;
 
     timespec now;
     gettime(&now);
     for (size_t i = 0; i < d_numBuckets; ++i) {
-      *d_buckets[i].lock() = Bucket(d_settings.d_bucketSize, d_fingerprintBytes, d_ttlBytes, now);
+      *d_buckets[i].lock() = Bucket(d_settings, now);
     }
   }
 
@@ -464,7 +468,7 @@ public:
     timespec now;
     gettime(&now);
 
-    if (d_buckets[i1].lock()->insert(fp, d_fingerprintBytes, now, d_settings.d_ttl, d_ttlBytes, d_settings.d_ttlResolution, d_settings.d_bucketSize) || d_buckets[i2].lock()->insert(fp, d_fingerprintBytes, now, d_settings.d_ttl, d_ttlBytes, d_settings.d_ttlResolution, d_settings.d_bucketSize)) {
+    if (d_buckets[i1].lock()->insert(fp, d_settings, now) || d_buckets[i2].lock()->insert(fp, d_settings, now)) {
       return;
     }
 
@@ -476,17 +480,17 @@ public:
 
     for (size_t kick = 0; kick < d_settings.d_maxKicks; ++kick) {
       if (d_settings.d_lruEnabled) {
-        bool kicked = d_buckets[cur_index].lock()->kick_lru(cur_fp, d_fingerprintBytes, d_ttlBytes, d_settings.d_bucketSize, cur_fp, cur_counter, cur_counter, cur_expiry, cur_expiry);
+        bool kicked = d_buckets[cur_index].lock()->kick_lru(cur_fp, d_settings, cur_fp, cur_counter, cur_counter, cur_expiry, cur_expiry);
         if (!kicked) {
           return;
         }
       }
       else {
-        cur_fp = d_buckets[cur_index].lock()->kick_random(cur_fp, d_fingerprintBytes, d_ttlBytes, d_settings.d_bucketSize, d_gen);
+        cur_fp = d_buckets[cur_index].lock()->kick_random(cur_fp, d_settings, d_gen);
       }
       cur_index = alt_index(cur_index, cur_fp);
 
-      if (d_buckets[cur_index].lock()->insert(cur_fp, d_fingerprintBytes, now, d_settings.d_ttl, d_ttlBytes, d_settings.d_ttlResolution, d_settings.d_bucketSize) || d_buckets[cur_index].lock()->insert(cur_fp, d_fingerprintBytes, now, d_settings.d_ttl, d_ttlBytes, d_settings.d_ttlResolution, d_settings.d_bucketSize)) {
+      if (d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now) || d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now)) {
         // TODO: counter is lost here and reset to 1 - probably not good
         return;
       }
@@ -506,7 +510,7 @@ public:
     timespec now;
     gettime(&now);
 
-    return d_buckets[i1].lock()->contains(fp, d_fingerprintBytes, now, d_settings.d_ttlResolution, d_ttlBytes, d_settings.d_bucketSize) || d_buckets[i2].lock()->contains(fp, d_fingerprintBytes, now, d_settings.d_ttlResolution, d_ttlBytes, d_settings.d_bucketSize);
+    return d_buckets[i1].lock()->contains(fp, d_settings, now) || d_buckets[i2].lock()->contains(fp, d_settings, now);
   }
 
   bool getValue(const std::string& key, [[maybe_unused]] std::string& value) override
@@ -544,54 +548,54 @@ private:
 
   struct Bucket
   {
-    uint32_t d_ttlBaseline;
+    decltype(timespec::tv_sec) d_ttlBaseline;
     std::vector<char> d_data;
 
     Bucket() {}
 
-    Bucket(size_t bucketSize, size_t fingerprintBytes, size_t ttlBytes, timespec& now) :
-      d_data(bucketSize * (data_block_size(fingerprintBytes, ttlBytes)), 0)
+    Bucket(const CuckooSettings& settings, const timespec& now) :
+      d_data(settings.d_bucketSize * (data_block_size(settings.d_fingerprintBytes, settings.d_ttlBytes)), 0)
     {
       d_ttlBaseline = now.tv_sec;
       // TODO: TTL strategies? Expiry time vs time left - one uses more memory, other requires occasional scan
     }
 
-    bool insert(Fingerprint fp, size_t fingerprintBytes, timespec now, size_t ttl, size_t ttlBytes, uint32_t ttlResolution, size_t bucketSize)
+    bool insert(Fingerprint fp, const CuckooSettings& settings, const timespec& now)
     {
-      for (size_t i = 0; i < bucketSize; ++i) {
+      for (size_t i = 0; i < settings.d_bucketSize; ++i) {
         Fingerprint storedFingerprint = 0;
-        memcpy(&storedFingerprint, &d_data[fingerprint_start(i, fingerprintBytes, ttlBytes)], fingerprintBytes);
+        memcpy(&storedFingerprint, &d_data[fingerprint_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_fingerprintBytes);
         bool reinsert = storedFingerprint == fp;
         uint32_t slotTtl = 0;
-        memcpy(&slotTtl, &d_data[ttl_start(i, fingerprintBytes, ttlBytes)], ttlBytes);
+        memcpy(&slotTtl, &d_data[ttl_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_ttlBytes);
         if (reinsert || storedFingerprint == EMPTY_FINGERPRINT || d_ttlBaseline + slotTtl <= now.tv_sec) {
           if (!reinsert) {
-            memcpy(&d_data[fingerprint_start(i, fingerprintBytes, ttlBytes)], &fp, fingerprintBytes);
-            d_data[lru_counter_start(i, fingerprintBytes, ttlBytes)] = 1;
+            memcpy(&d_data[fingerprint_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], &fp, settings.d_fingerprintBytes);
+            d_data[lru_counter_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)] = 1;
           }
           else {
-            d_data[lru_counter_start(i, fingerprintBytes, ttlBytes)] += 1;
+            d_data[lru_counter_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)] += 1;
           }
 
-          auto expiry = now.tv_sec / ttlResolution + ttl - d_ttlBaseline / ttlResolution;
-          if (expiry > (std::pow(2, ttlBytes * 8))) {
+          auto expiry = now.tv_sec / settings.d_ttlResolution + settings.d_ttl - d_ttlBaseline / settings.d_ttlResolution;
+          if (expiry > (std::pow(2, settings.d_ttlBytes * 8))) {
             auto diff = now.tv_sec - d_ttlBaseline;
             d_ttlBaseline += diff;
-            expiry -= diff / ttlResolution;
+            expiry -= diff / settings.d_ttlResolution;
 
             // Adjust all TTLs for new baseline
-            for (size_t j = 0; j < bucketSize; ++j) {
+            for (size_t j = 0; j < settings.d_bucketSize; ++j) {
               if (i == j)
                 continue;
 
               slotTtl = 0;
-              memcpy(&slotTtl, &d_data[ttl_start(j, fingerprintBytes, ttlBytes)], ttlBytes);
-              slotTtl -= diff / ttlResolution;
-              memcpy(&d_data[ttl_start(j, fingerprintBytes, ttlBytes)], &slotTtl, ttlBytes);
+              memcpy(&slotTtl, &d_data[ttl_start(j, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_ttlBytes);
+              slotTtl -= diff / settings.d_ttlResolution;
+              memcpy(&d_data[ttl_start(j, settings.d_fingerprintBytes, settings.d_ttlBytes)], &slotTtl, settings.d_ttlBytes);
             }
           }
 
-          memcpy(&d_data[ttl_start(i, fingerprintBytes, ttlBytes)], &expiry, ttlBytes);
+          memcpy(&d_data[ttl_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], &expiry, settings.d_ttlBytes);
           return true;
         }
       }
@@ -599,23 +603,23 @@ private:
     }
 
     // Lookup with minimal locking
-    bool contains(Fingerprint fp, size_t fingerprintBytes, timespec now, uint32_t ttlResolution, size_t ttlBytes, size_t bucketSize)
+    bool contains(Fingerprint fp, const CuckooSettings& settings, const timespec& now)
     {
-      for (size_t i = 0; i < bucketSize; ++i) {
+      for (size_t i = 0; i < settings.d_bucketSize; ++i) {
         Fingerprint storedFingerprint = 0;
-        memcpy(&storedFingerprint, &d_data[fingerprint_start(i, fingerprintBytes, ttlBytes)], fingerprintBytes);
+        memcpy(&storedFingerprint, &d_data[fingerprint_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_fingerprintBytes);
         if (storedFingerprint == fp) {
           uint32_t slotTtl = 0;
-          memcpy(&slotTtl, &d_data[ttl_start(i, fingerprintBytes, ttlBytes)], ttlBytes);
-          if (d_ttlBaseline + slotTtl * ttlResolution <= now.tv_sec) {
-            memcpy(&d_data[fingerprint_start(i, fingerprintBytes, ttlBytes)], &EMPTY_FINGERPRINT, fingerprintBytes);
-            d_data[lru_counter_start(i, fingerprintBytes, ttlBytes)] = 0;
+          memcpy(&slotTtl, &d_data[ttl_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_ttlBytes);
+          if (d_ttlBaseline + slotTtl * settings.d_ttlResolution <= now.tv_sec) {
+            memcpy(&d_data[fingerprint_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], &EMPTY_FINGERPRINT, settings.d_fingerprintBytes);
+            d_data[lru_counter_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)] = 0;
             // TODO: using empty fingerprint here is confusing
-            memcpy(&d_data[ttl_start(i, fingerprintBytes, ttlBytes)], &EMPTY_FINGERPRINT, ttlBytes);
+            memcpy(&d_data[ttl_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], &EMPTY_FINGERPRINT, settings.d_ttlBytes);
             return false;
           }
           else {
-            d_data[lru_counter_start(i, fingerprintBytes, ttlBytes)] += 1;
+            d_data[lru_counter_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)] += 1;
             return true;
           }
         }
@@ -642,40 +646,40 @@ private:
 
     // For cuckoo eviction - returns evicted fingerprint
     // TODO: store new timer and ttl and stuff
-    Fingerprint kick_random(Fingerprint new_fp, size_t fingerprintBytes, size_t ttlBytes, size_t bucketSize, std::mt19937& rng)
+    Fingerprint kick_random(Fingerprint new_fp, const CuckooSettings& settings, std::mt19937& rng)
     {
-      size_t pos = rng() % bucketSize;
+      size_t pos = rng() % settings.d_bucketSize;
       Fingerprint old_fp = 0;
-      memcpy(&old_fp, &d_data[fingerprint_start(pos, fingerprintBytes, ttlBytes)], fingerprintBytes);
-      memcpy(&d_data[fingerprint_start(pos, fingerprintBytes, ttlBytes)], &new_fp, fingerprintBytes);
+      memcpy(&old_fp, &d_data[fingerprint_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_fingerprintBytes);
+      memcpy(&d_data[fingerprint_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)], &new_fp, settings.d_fingerprintBytes);
       return old_fp;
     }
 
     // For LRU cuckoo eviction - returns true if fingeprint was evicted - the fingeprint is stored in kicked_fp
-    bool kick_lru(Fingerprint new_fp, size_t fingerprintBytes, size_t ttlBytes, size_t bucketSize, Fingerprint& kicked_fp, uint8_t newCounter, uint8_t& counter, uint32_t newExpiry, uint32_t& expiry)
+    bool kick_lru(Fingerprint new_fp, const CuckooSettings& settings, Fingerprint& kicked_fp, uint8_t newCounter, uint8_t& counter, uint32_t newExpiry, uint32_t& expiry)
     {
       uint8_t min = newCounter;
-      size_t pos = bucketSize;
-      for (size_t i = 0; i < bucketSize; ++i) {
+      size_t pos = settings.d_bucketSize;
+      for (size_t i = 0; i < settings.d_bucketSize; ++i) {
         Fingerprint storedFingerprint = 0;
-        memcpy(&storedFingerprint, &d_data[fingerprint_start(i, fingerprintBytes, ttlBytes)], fingerprintBytes);
+        memcpy(&storedFingerprint, &d_data[fingerprint_start(i, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_fingerprintBytes);
         if (storedFingerprint < min) {
           pos = i;
         }
       }
-      if (pos < bucketSize) {
+      if (pos < settings.d_bucketSize) {
         // TODO: Consider bucket baselines when doing this swap
-        counter = d_data[lru_counter_start(pos, fingerprintBytes, ttlBytes)];
-        memcpy(&expiry, &d_data[ttl_start(pos, fingerprintBytes, ttlBytes)], ttlBytes);
-        d_data[lru_counter_start(pos, fingerprintBytes, ttlBytes)] = newCounter;
-        memcpy(&d_data[ttl_start(pos, fingerprintBytes, ttlBytes)], &newExpiry, ttlBytes);
+        counter = d_data[lru_counter_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)];
+        memcpy(&expiry, &d_data[ttl_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_ttlBytes);
+        d_data[lru_counter_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)] = newCounter;
+        memcpy(&d_data[ttl_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)], &newExpiry, settings.d_ttlBytes);
       }
       else {
         return false;
       }
       Fingerprint old_fp = 0;
-      memcpy(&old_fp, &d_data[fingerprint_start(pos, fingerprintBytes, ttlBytes)], fingerprintBytes);
-      memcpy(&d_data[fingerprint_start(pos, fingerprintBytes, ttlBytes)], &new_fp, fingerprintBytes);
+      memcpy(&old_fp, &d_data[fingerprint_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)], settings.d_fingerprintBytes);
+      memcpy(&d_data[fingerprint_start(pos, settings.d_fingerprintBytes, settings.d_ttlBytes)], &new_fp, settings.d_fingerprintBytes);
       kicked_fp = old_fp;
       return true;
     }
@@ -755,8 +759,6 @@ private:
   size_t d_numBuckets;
   size_t d_numBucketsMask;
   Fingerprint d_fingerprintMask;
-  size_t d_fingerprintBytes;
-  size_t d_ttlBytes;
   std::vector<LockGuarded<Bucket>> d_buckets;
   std::mt19937 d_gen;
 };
