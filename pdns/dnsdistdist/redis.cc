@@ -377,6 +377,12 @@ bool CopyCache::contains(const std::string& key)
   return map->find(key) != map->end();
 };
 
+bool CopyCache::remove(const std::string& key)
+{
+  auto map = d_map.write_lock();
+  return map->erase(key) > 0;
+};
+
 bool CopyCache::needsUpdate()
 {
   struct timespec now;

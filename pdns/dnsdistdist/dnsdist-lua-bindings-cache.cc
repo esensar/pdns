@@ -93,6 +93,14 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     return result;
   });
 
+  luaCtx.registerFunction<bool (std::shared_ptr<cache_t>::*)(const std::string&)>("remove", [](std::shared_ptr<cache_t>& cache, const std::string& key) {
+    if (!cache) {
+      return false;
+    }
+
+    return cache->remove(key);
+  });
+
   luaCtx.registerFunction<bool (std::shared_ptr<cache_t>::*)(const std::string&)>("contains", [](std::shared_ptr<cache_t>& cache, const std::string& key) {
     if (!cache) {
       return false;
