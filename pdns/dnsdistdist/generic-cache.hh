@@ -61,6 +61,7 @@ public:
   virtual ~GenericFilterInterface() {};
   virtual void insertKey(const K& key) = 0;
   virtual bool contains(const K& key) = 0;
+  virtual bool remove(const K& key) = 0;
 };
 
 template <typename K, typename V>
@@ -255,6 +256,16 @@ public:
     return result;
   }
 
+  bool remove(const K& key) override
+  {
+    size_t hash = Hash{}(key);
+    size_t shardIndex = hash % d_settings.d_shardCount;
+    auto& shard = d_shards.at(shardIndex);
+    auto map = shard.d_map.write_lock();
+
+    return map->erase(key) > 0;
+  }
+
   size_t purgeExpired(size_t upTo, const time_t now) override
   {
     if (d_settings.d_ttlEnabled) {
@@ -393,6 +404,12 @@ public:
     return d_sbf.lock()->test(key);
   }
 
+  bool remove([[maybe_unused]] const std::string& key) override
+  {
+    // Unsupported
+    return false;
+  }
+
   bool getValue(const std::string& key, [[maybe_unused]] std::string& value) override
   {
     return contains(key);
@@ -518,6 +535,13 @@ public:
     gettime(&now);
 
     return d_buckets[i1].lock()->contains(fp, d_settings, now) || d_buckets[i2].lock()->contains(fp, d_settings, now);
+  }
+
+  bool remove(const std::string& key) override
+  {
+    auto [i1, i2, fp] = get_indices_and_fingerprint(key);
+
+    return d_buckets[i1].lock()->remove(fp, d_settings) || d_buckets[i2].lock()->remove(fp, d_settings);
   }
 
   bool getValue(const std::string& key, [[maybe_unused]] std::string& value) override

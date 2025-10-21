@@ -548,6 +548,7 @@ public:
   void insertKey(const std::string& key) override;
   bool getValue(const std::string& key, std::string& value) override;
   bool contains(const std::string& key) override;
+  bool remove(const std::string& key) override;
   size_t purgeExpired(size_t upTo, const time_t now) override;
   size_t expunge(size_t upTo = 0) override;
 
