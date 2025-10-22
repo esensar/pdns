@@ -590,7 +590,6 @@ public:
     gettime(&now);
 
     if (d_buckets[i1].lock()->insert(fp, d_settings, now, d_stats) || d_buckets[i2].lock()->insert(fp, d_settings, now, d_stats)) {
-      d_stats.d_entriesCount += 1;
       return;
     }
 
@@ -737,8 +736,12 @@ private:
           }
 
           if (settings.d_ttlEnabled) {
-            if (d_ttlBaseline + slotTtl <= now.tv_sec) {
+            // Expired item was replaced
+            if (storedFingerprint != EMPTY_FINGERPRINT && d_ttlBaseline + slotTtl <= now.tv_sec) {
               stats.d_expiredItems += 1;
+              if (!reinsert) {
+                stats.d_entriesCount -= 1;
+              }
             }
 
             auto expiry = now.tv_sec / settings.d_ttlResolution + settings.d_ttl - d_ttlBaseline / settings.d_ttlResolution;
@@ -754,7 +757,7 @@ private:
 
                 slotTtl = 0;
                 memcpy(&slotTtl, &d_data[ttl_start(j, settings)], settings.d_ttlBytes);
-                slotTtl -= diff / settings.d_ttlResolution;
+                slotTtl = std::max(slotTtl - diff / settings.d_ttlResolution, 0L);
                 memcpy(&d_data[ttl_start(j, settings)], &slotTtl, settings.d_ttlBytes);
               }
             }
@@ -786,6 +789,7 @@ private:
             // TODO: using empty fingerprint here is confusing
             memcpy(&d_data[ttl_start(i, settings)], &EMPTY_FINGERPRINT, settings.d_ttlBytes);
             stats.d_expiredItems += 1;
+            stats.d_entriesCount -= 1;
             return false;
           }
           else {
