@@ -32,6 +32,7 @@
 #include <cmath>
 #include <cstring>
 #include <iterator>
+#include <numeric>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
@@ -39,6 +40,7 @@
 #include <random>
 
 #include "cachecleaner.hh"
+#include "dnsdist.hh"
 #include "gettime.hh"
 #include "lock.hh"
 #include "ext/probds/murmur3.h"
@@ -67,10 +69,38 @@ public:
 template <typename K, typename V>
 class GenericCacheInterface : public GenericFilterInterface<K>
 {
+protected:
+  struct Stats
+  {
+    Stats() {}
+    explicit Stats(std::string labels) :
+      d_labels(labels) {}
+
+    stat_t d_memoryUsed{0};
+    stat_t d_cacheHits{0};
+    stat_t d_cacheMisses{0};
+    stat_t d_entriesCount{0};
+    stat_t d_kickedItems{0};
+    stat_t d_expiredItems{0};
+    std::string d_labels{};
+
+    Stats& operator+=(const Stats& rhs)
+    {
+      d_memoryUsed += rhs.d_memoryUsed;
+      d_cacheHits += d_cacheHits;
+      d_cacheMisses += d_cacheMisses;
+      d_entriesCount += d_entriesCount;
+      d_kickedItems += d_kickedItems;
+      d_expiredItems += d_expiredItems;
+      return *this;
+    }
+  };
+
 public:
   virtual ~GenericCacheInterface() {};
   virtual void insert(const K& key, V value) = 0;
   virtual bool getValue(const K& key, V& value) = 0;
+  [[nodiscard]] virtual Stats& getStats() = 0;
 };
 
 template <typename K, typename V, typename Hash = std::hash<K>>
@@ -98,6 +128,7 @@ public:
   GenericCache(CacheSettings settings) :
     d_settings(settings), d_shards(settings.d_shardCount)
   {
+    d_stats.d_memoryUsed = sizeof(*this) + d_shards.size() * sizeof(CacheShard);
   }
   virtual ~GenericCache() {};
 
@@ -146,14 +177,16 @@ public:
 
     auto result = map->insert(cacheValue);
 
-    // TODO memory usage calculation here?
     if (!result.second) {
+      // This key already exists - replace it
       if (map->replace(result.first, cacheValue)) {
-        ++shard.d_entriesCount;
+        d_stats.d_memoryUsed += sizeof(cacheValue) - sizeof(result.first);
       }
     }
     else {
+      ++d_stats.d_entriesCount;
       ++shard.d_entriesCount;
+      d_stats.d_memoryUsed += sizeof(cacheValue);
     }
   }
 
@@ -178,6 +211,7 @@ public:
 
       auto mapIt = map->find(key);
       if (mapIt == map->end()) {
+        d_stats.d_cacheMisses += 1;
         return false;
       }
 
@@ -195,6 +229,13 @@ public:
       }
     }
 
+    if (result) {
+      d_stats.d_cacheHits += 1;
+    }
+    else {
+      d_stats.d_cacheMisses += 1;
+    }
+
     if (d_settings.d_lruEnabled || (!result && d_settings.d_ttlEnabled)) {
       auto map = shard.d_map.write_lock();
       auto mapIt = map->find(key);
@@ -205,6 +246,10 @@ public:
         moveCacheItemToBack<SequencedTag>(*map, mapIt);
       }
       if (!result && d_settings.d_ttlEnabled) {
+        shard.d_entriesCount -= 1;
+        d_stats.d_entriesCount -= 1;
+        d_stats.d_expiredItems += 1;
+        d_stats.d_memoryUsed -= sizeof(*mapIt);
         map->erase(mapIt);
       }
     }
@@ -224,6 +269,7 @@ public:
       auto mapIt = map->find(key);
 
       if (mapIt == map->end()) {
+        d_stats.d_cacheMisses += 1;
         return false;
       }
 
@@ -239,6 +285,13 @@ public:
       }
     }
 
+    if (result) {
+      d_stats.d_cacheHits += 1;
+    }
+    else {
+      d_stats.d_cacheMisses += 1;
+    }
+
     if (d_settings.d_lruEnabled || (!result && d_settings.d_ttlEnabled)) {
       auto map = shard.d_map.write_lock();
       auto mapIt = map->find(key);
@@ -249,6 +302,10 @@ public:
         moveCacheItemToBack<SequencedTag>(*map, mapIt);
       }
       if (!result && d_settings.d_ttlEnabled) {
+        shard.d_entriesCount -= 1;
+        d_stats.d_entriesCount -= 1;
+        d_stats.d_expiredItems += 1;
+        d_stats.d_memoryUsed -= sizeof(*mapIt);
         map->erase(mapIt);
       }
     }
@@ -263,7 +320,16 @@ public:
     auto& shard = d_shards.at(shardIndex);
     auto map = shard.d_map.write_lock();
 
-    return map->erase(key) > 0;
+    auto mapIt = map->find(key);
+    if (mapIt == map->end()) {
+      return false;
+    }
+
+    shard.d_entriesCount -= 1;
+    d_stats.d_entriesCount -= 1;
+    d_stats.d_memoryUsed -= sizeof(*mapIt);
+    map->erase(mapIt);
+    return true;
   }
 
   size_t purgeExpired(size_t upTo, const time_t now) override
@@ -282,6 +348,7 @@ public:
 
         for (auto it = map->begin(); toRemove > 0 && it != map->end();) {
           if (it->validity <= now) {
+            d_stats.d_memoryUsed -= sizeof(*it);
             it = map->erase(it);
             --toRemove;
             --shard.d_entriesCount;
@@ -292,6 +359,9 @@ public:
           }
         }
       }
+
+      d_stats.d_entriesCount -= removed;
+      d_stats.d_expiredItems += removed;
 
       return removed;
     }
@@ -323,6 +393,7 @@ public:
         std::advance(endIt, toRemove);
         sequence.erase(beginIt, endIt);
         shard.d_entriesCount -= toRemove;
+        // TODO update memory usage
         removed += toRemove;
       }
       else {
@@ -332,7 +403,15 @@ public:
       }
     }
 
+    d_stats.d_entriesCount -= removed;
+    d_stats.d_kickedItems += removed;
+
     return removed;
+  }
+
+  [[nodiscard]] virtual typename GenericCacheInterface<K, V>::Stats& getStats() override
+  {
+    return d_stats;
   }
 
 private:
@@ -370,6 +449,7 @@ private:
 
   CacheSettings d_settings;
   std::vector<CacheShard> d_shards;
+  typename GenericCacheInterface<K, V>::Stats d_stats{"filter=\"none\""};
 };
 
 class BloomFilter : public GenericCacheInterface<std::string, std::string>
@@ -385,6 +465,7 @@ public:
   BloomFilter(BloomSettings settings) :
     d_settings(settings), d_sbf(bf::stableBF(settings.d_fpRate, settings.d_numCells, settings.d_numDec))
   {
+    d_stats.d_memoryUsed += sizeof(*this);
   }
 
   virtual ~BloomFilter() {};
@@ -392,6 +473,7 @@ public:
   void insertKey(const std::string& key) override
   {
     d_sbf.lock()->add(key);
+    d_stats.d_entriesCount += 1;
   }
 
   void insert(const std::string& key, [[maybe_unused]] std::string value) override
@@ -401,7 +483,14 @@ public:
 
   bool contains(const std::string& key) override
   {
-    return d_sbf.lock()->test(key);
+    auto result = d_sbf.lock()->test(key);
+    if (result) {
+      d_stats.d_cacheHits += 1;
+    }
+    else {
+      d_stats.d_cacheMisses += 1;
+    }
+    return result;
   }
 
   bool remove([[maybe_unused]] const std::string& key) override
@@ -427,9 +516,15 @@ public:
     return 0;
   }
 
+  [[nodiscard]] virtual GenericCacheInterface<std::string, std::string>::Stats& getStats() override
+  {
+    return d_stats;
+  }
+
 private:
   BloomSettings d_settings;
   LockGuarded<bf::stableBF> d_sbf;
+  GenericCacheInterface<std::string, std::string>::Stats d_stats{"filter=\"bloom\""};
 };
 
 class CuckooFilter : public GenericCacheInterface<std::string, std::string>
@@ -482,6 +577,8 @@ public:
     for (size_t i = 0; i < d_numBuckets; ++i) {
       *d_buckets[i].lock() = Bucket(d_settings, now);
     }
+
+    d_stats.d_memoryUsed += sizeof(*this) + std::transform_reduce(d_buckets.begin(), d_buckets.end(), 0, std::plus<>(), [](LockGuarded<Bucket>& bucket) { return sizeof(Bucket) + bucket.lock()->d_data.size(); });
   }
 
   virtual ~CuckooFilter() {};
@@ -492,7 +589,8 @@ public:
     timespec now;
     gettime(&now);
 
-    if (d_buckets[i1].lock()->insert(fp, d_settings, now) || d_buckets[i2].lock()->insert(fp, d_settings, now)) {
+    if (d_buckets[i1].lock()->insert(fp, d_settings, now, d_stats) || d_buckets[i2].lock()->insert(fp, d_settings, now, d_stats)) {
+      d_stats.d_entriesCount += 1;
       return;
     }
 
@@ -504,6 +602,7 @@ public:
 
     for (size_t kick = 0; kick < d_settings.d_maxKicks; ++kick) {
       if (d_settings.d_lruEnabled) {
+        // TODO: Should starting counter be different?
         bool kicked = d_buckets[cur_index].lock()->kick_lru(cur_fp, d_settings, cur_fp, cur_counter, cur_counter, cur_expiry, cur_expiry);
         if (!kicked) {
           return;
@@ -514,12 +613,13 @@ public:
       }
       cur_index = alt_index(cur_index, cur_fp);
 
-      if (d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now) || d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now)) {
+      if (d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now, d_stats) || d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now, d_stats)) {
         // TODO: counter is lost here and reset to 1 - probably not good
         return;
       }
     }
 
+    d_stats.d_kickedItems += 1;
     return; // Filter is full
   }
 
@@ -534,14 +634,28 @@ public:
     timespec now;
     gettime(&now);
 
-    return d_buckets[i1].lock()->contains(fp, d_settings, now) || d_buckets[i2].lock()->contains(fp, d_settings, now);
+    auto result = d_buckets[i1].lock()->contains(fp, d_settings, now, d_stats) || d_buckets[i2].lock()->contains(fp, d_settings, now, d_stats);
+
+    if (result) {
+      d_stats.d_cacheHits += 1;
+    }
+    else {
+      d_stats.d_cacheMisses += 1;
+    }
+
+    return result;
   }
 
   bool remove(const std::string& key) override
   {
     auto [i1, i2, fp] = get_indices_and_fingerprint(key);
 
-    return d_buckets[i1].lock()->remove(fp, d_settings) || d_buckets[i2].lock()->remove(fp, d_settings);
+    auto removed = d_buckets[i1].lock()->remove(fp, d_settings) || d_buckets[i2].lock()->remove(fp, d_settings);
+
+    if (removed) {
+      d_stats.d_entriesCount -= 1;
+    }
+    return removed;
   }
 
   bool getValue(const std::string& key, [[maybe_unused]] std::string& value) override
@@ -561,8 +675,14 @@ public:
     return 0;
   }
 
+  [[nodiscard]] virtual GenericCacheInterface<std::string, std::string>::Stats& getStats() override
+  {
+    return d_stats;
+  }
+
 private:
   using Fingerprint = uint32_t;
+  using stats_t = GenericCacheInterface<std::string, std::string>::Stats;
 
   static constexpr Fingerprint EMPTY_FINGERPRINT = 0;
 
@@ -577,6 +697,7 @@ private:
     return numBuckets;
   }
 
+  // TODO: handle stats updates inside bucket operations (expired, etc.)
   struct Bucket
   {
     decltype(timespec::tv_sec) d_ttlBaseline;
@@ -591,20 +712,23 @@ private:
       // TODO: TTL strategies? Expiry time vs time left - one uses more memory, other requires occasional scan
     }
 
-    bool insert(Fingerprint fp, const CuckooSettings& settings, const timespec& now)
+    bool insert(Fingerprint fp, const CuckooSettings& settings, const timespec& now, stats_t& stats)
     {
       for (size_t i = 0; i < settings.d_bucketSize; ++i) {
         Fingerprint storedFingerprint = 0;
         memcpy(&storedFingerprint, &d_data[fingerprint_start(i, settings)], settings.d_fingerprintBytes);
         bool reinsert = storedFingerprint == fp;
         uint32_t slotTtl = 0;
-        memcpy(&slotTtl, &d_data[ttl_start(i, settings)], settings.d_ttlBytes);
+        if (settings.d_ttlEnabled) {
+          memcpy(&slotTtl, &d_data[ttl_start(i, settings)], settings.d_ttlBytes);
+        }
         if (reinsert || storedFingerprint == EMPTY_FINGERPRINT || (settings.d_ttlEnabled && d_ttlBaseline + slotTtl <= now.tv_sec)) {
           if (!reinsert) {
             memcpy(&d_data[fingerprint_start(i, settings)], &fp, settings.d_fingerprintBytes);
             if (settings.d_lruEnabled) {
               d_data[lru_counter_start(i, settings)] = 1;
             }
+            stats.d_entriesCount += 1;
           }
           else {
             if (settings.d_lruEnabled) {
@@ -613,6 +737,10 @@ private:
           }
 
           if (settings.d_ttlEnabled) {
+            if (d_ttlBaseline + slotTtl <= now.tv_sec) {
+              stats.d_expiredItems += 1;
+            }
+
             auto expiry = now.tv_sec / settings.d_ttlResolution + settings.d_ttl - d_ttlBaseline / settings.d_ttlResolution;
             if (expiry > (std::pow(2, settings.d_ttlBytes * 8))) {
               auto diff = now.tv_sec - d_ttlBaseline;
@@ -640,7 +768,7 @@ private:
     }
 
     // Lookup with minimal locking
-    bool contains(Fingerprint fp, const CuckooSettings& settings, const timespec& now)
+    bool contains(Fingerprint fp, const CuckooSettings& settings, const timespec& now, stats_t& stats)
     {
       for (size_t i = 0; i < settings.d_bucketSize; ++i) {
         Fingerprint storedFingerprint = 0;
@@ -657,6 +785,7 @@ private:
             d_data[lru_counter_start(i, settings)] = 0;
             // TODO: using empty fingerprint here is confusing
             memcpy(&d_data[ttl_start(i, settings)], &EMPTY_FINGERPRINT, settings.d_ttlBytes);
+            stats.d_expiredItems += 1;
             return false;
           }
           else {
@@ -804,4 +933,5 @@ private:
   Fingerprint d_fingerprintMask;
   std::vector<LockGuarded<Bucket>> d_buckets;
   std::mt19937 d_gen;
+  GenericCacheInterface<std::string, std::string>::Stats d_stats{"filter=\"cuckoo\""};
 };

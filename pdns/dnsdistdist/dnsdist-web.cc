@@ -887,6 +887,40 @@ static void handlePrometheus(const YaHTTP::Request& req, YaHTTP::Response& resp)
     }
   }
 
+  const string genericcachebase = "dnsdist_genericcache_";
+  output << "# HELP dnsdist_genericcache_memory_used " << "Memory used by cache in bytes" << "\n";
+  output << "# TYPE dnsdist_genericcache_memory_used " << "gauge" << "\n";
+  output << "# HELP dnsdist_genericcache_entries " << "Number of cached items" << "\n";
+  output << "# TYPE dnsdist_genericcache_entries " << "gauge" << "\n";
+  output << "# HELP dnsdist_genericcache_cache_hits " << "Number of cache hits" << "\n";
+  output << "# TYPE dnsdist_genericcache_cache_hits " << "counter" << "\n";
+  output << "# HELP dnsdist_genericcache_cache_misses " << "Number of cache misses" << "\n";
+  output << "# TYPE dnsdist_genericcache_cache_misses " << "counter" << "\n";
+  output << "# HELP dnsdist_genericcache_expired " << "Number of expired items" << "\n";
+  output << "# TYPE dnsdist_genericcache_expired " << "counter" << "\n";
+  output << "# HELP dnsdist_genericcache_kicked " << "Number of kicked items" << "\n";
+  output << "# TYPE dnsdist_genericcache_kicked " << "counter" << "\n";
+
+  for (const auto& entry : dnsdist::configuration::getCurrentRuntimeConfiguration().d_caches) {
+    string cacheName = entry.first;
+
+    if (cacheName.empty()) {
+      cacheName = "_default_";
+    }
+    const std::shared_ptr<GenericCacheInterface<std::string, std::string>> cache = entry.second;
+
+    const auto& stats = cache->getStats();
+
+    const string label = "{cache=\"" + cacheName + "\"," + stats.d_labels + "}";
+
+    output << genericcachebase << "memory_used" << label << " " << stats.d_memoryUsed << "\n";
+    output << genericcachebase << "entries" << label << " " << stats.d_entriesCount << "\n";
+    output << genericcachebase << "cache_hits" << label << " " << stats.d_cacheHits << "\n";
+    output << genericcachebase << "cache_misses" << label << " " << stats.d_cacheMisses << "\n";
+    output << genericcachebase << "expired" << label << " " << stats.d_expiredItems << "\n";
+    output << genericcachebase << "kicked" << label << " " << stats.d_kickedItems << "\n";
+  }
+
   output << "# HELP dnsdist_rule_hits " << "Number of hits of that rule" << "\n";
   output << "# TYPE dnsdist_rule_hits " << "counter" << "\n";
   const auto& chains = dnsdist::configuration::getCurrentRuntimeConfiguration().d_ruleChains;

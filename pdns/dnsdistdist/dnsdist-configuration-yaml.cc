@@ -1847,6 +1847,7 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
   }
 #endif /* defined(HAVE_CDB) */
 #if defined(HAVE_REDIS)
+  // TODO: register in runtime configuration and add names - probably keep caches as separate components
   for (const auto& redis : config.redis) {
     if (createObjects) {
       auto client = std::make_shared<RedisClient>(std::string(redis.url), redis.pipeline_enabled, redis.pipeline_interval);
