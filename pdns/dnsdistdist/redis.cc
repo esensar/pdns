@@ -19,6 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
+#include "generic-cache.hh"
 #include "gettime.hh"
 #include "threadname.hh"
 #include <condition_variable>
@@ -347,6 +348,8 @@ void CopyCache::insert(const std::string& key, std::string value)
 {
   auto map = d_map.write_lock();
   map->emplace(key, value);
+  d_stats.d_entriesCount += 1;
+  d_stats.d_memoryUsed += sizeof(key) + sizeof(value) + key.size() + value.size();
 };
 
 void CopyCache::insertKey([[maybe_unused]] const std::string& key)
@@ -357,6 +360,7 @@ void CopyCache::insertKey([[maybe_unused]] const std::string& key)
 bool CopyCache::getValue(const std::string& key, std::string& value)
 {
   if (needsUpdate()) {
+    d_stats.d_cacheMisses += 1;
     return false;
   }
 
@@ -365,26 +369,46 @@ bool CopyCache::getValue(const std::string& key, std::string& value)
   auto entry = map->find(key);
   if (entry != map->end()) {
     value = entry->second;
+    d_stats.d_cacheHits += 1;
     return true;
   }
 
+  d_stats.d_cacheMisses += 1;
   return false;
 };
 
 bool CopyCache::contains(const std::string& key)
 {
   auto map = d_map.read_lock();
-  return map->find(key) != map->end();
+  auto result = map->find(key) != map->end();
+  if (result) {
+    d_stats.d_cacheHits += 1;
+  }
+  else {
+    d_stats.d_cacheMisses += 1;
+  }
+
+  return result;
 };
 
 bool CopyCache::remove(const std::string& key)
 {
   auto map = d_map.write_lock();
-  return map->erase(key) > 0;
+  auto mapIt = map->find(key);
+  if (mapIt == map->end()) {
+    return false;
+  }
+
+  d_stats.d_entriesCount -= 1;
+  d_stats.d_memoryUsed -= sizeof(key) + sizeof(mapIt->second) + key.size() + mapIt->second.size();
+
+  map->erase(mapIt);
+  return true;
 };
 
 bool CopyCache::needsUpdate()
 {
+  // TODO: count number of full refreshes too?
   struct timespec now;
   gettime(&now);
   return d_lastInsert + d_ttl < now.tv_sec;
@@ -395,9 +419,14 @@ void CopyCache::insertBatch(std::unordered_map<std::string, std::string> batch)
   auto map = d_map.write_lock();
 
   map->clear();
+  d_stats.d_entriesCount = 0;
+  d_stats.d_memoryUsed = sizeof(*this);
   for (auto entry : batch) {
     map->emplace(entry);
+    d_stats.d_memoryUsed += entry.first.size() + entry.second.size();
   }
+  d_stats.d_entriesCount = batch.size();
+  d_stats.d_memoryUsed += batch.size() * 2 * sizeof(std::string);
   struct timespec now;
   gettime(&now);
   d_lastInsert = now.tv_sec;
@@ -406,11 +435,14 @@ void CopyCache::insertBatch(std::unordered_map<std::string, std::string> batch)
 size_t CopyCache::purgeExpired([[maybe_unused]] size_t upTo, const time_t now)
 {
   if (d_lastInsert < now - d_ttl) {
-    return expunge(upTo);
+    auto removed = expunge(upTo);
+    d_stats.d_expiredItems += removed;
+    return removed;
   }
 
   return 0;
 };
+
 size_t CopyCache::expunge([[maybe_unused]] size_t upTo)
 {
   auto map = d_map.write_lock();
@@ -422,12 +454,23 @@ size_t CopyCache::expunge([[maybe_unused]] size_t upTo)
   if (map->size() >= toRemove) {
     std::advance(endIt, toRemove);
     map->erase(beginIt, endIt);
+    // TODO: memory usage recalculation
+    d_stats.d_kickedItems += toRemove;
+    d_stats.d_entriesCount -= toRemove;
     return toRemove;
   }
   else {
+    auto removed = map->size();
     map->clear();
-    return map->size();
+    d_stats.d_kickedItems += removed;
+    d_stats.d_entriesCount -= removed;
+    return removed;
   }
+};
+
+[[nodiscard]] GenericCacheInterface<std::string, std::string>::Stats& CopyCache::getStats()
+{
+  return d_stats;
 };
 
 bool CopyCachingRedisClient::getValue(const std::string& key, std::string& value)

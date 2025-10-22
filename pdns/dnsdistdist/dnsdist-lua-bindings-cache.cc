@@ -23,12 +23,13 @@
 #include "dnsdist-lua.hh"
 #include "generic-cache.hh"
 #include <memory>
+#include <stdexcept>
 
 using cache_t = GenericCacheInterface<std::string, std::string>;
 
 void setupLuaBindingsCache(LuaContext& luaCtx)
 {
-  luaCtx.writeFunction("newObjectCache", [](boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
+  luaCtx.writeFunction("newObjectCache", [](const std::string& name, boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
     unsigned int shardCount{1};
     unsigned int ttl{100};
     unsigned int maxEntries{100};
@@ -42,10 +43,18 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     getOptionalIntegerValue<unsigned int>("newObjectCache", vars, "lruDeleteUpTo", lruDeleteUpTo);
     getOptionalIntegerValue<unsigned int>("newObjectCache", vars, "ttl", ttl);
 
-    return std::shared_ptr<cache_t>(new GenericCache<std::string, std::string>({.d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_lruEnabled = lruEnabled, .d_shardCount = shardCount, .d_maxEntries = maxEntries, .d_lruDeleteUpTo = lruDeleteUpTo}));
+    auto cache = std::shared_ptr<cache_t>(new GenericCache<std::string, std::string>({.d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_lruEnabled = lruEnabled, .d_shardCount = shardCount, .d_maxEntries = maxEntries, .d_lruDeleteUpTo = lruDeleteUpTo}));
+
+    dnsdist::configuration::updateRuntimeConfiguration([name, &cache](dnsdist::configuration::RuntimeConfiguration& config) {
+      if (config.d_caches.count(name) > 0) {
+        throw std::runtime_error("Duplicate cache name: " + name);
+      }
+      config.d_caches.emplace(name, cache);
+    });
+    return cache;
   });
 
-  luaCtx.writeFunction("newBloomFilter", [](boost::optional<LuaAssociativeTable<boost::variant<std::string, float>>> vars) {
+  luaCtx.writeFunction("newBloomFilter", [](const std::string& name, boost::optional<LuaAssociativeTable<boost::variant<std::string, float>>> vars) {
     unsigned int maxEntries{67108864};
     float fpRate{0.01};
     unsigned int numDec{10};
@@ -53,10 +62,18 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     getOptionalIntegerValue<unsigned int>("newBloomFilter", vars, "numDec", numDec);
     getOptionalValue<float>(vars, "fpRate", fpRate);
 
-    return std::shared_ptr<cache_t>(new BloomFilter({.d_fpRate = fpRate, .d_numCells = maxEntries, .d_numDec = numDec}));
+    auto filter = std::shared_ptr<cache_t>(new BloomFilter({.d_fpRate = fpRate, .d_numCells = maxEntries, .d_numDec = numDec}));
+
+    dnsdist::configuration::updateRuntimeConfiguration([name, &filter](dnsdist::configuration::RuntimeConfiguration& config) {
+      if (config.d_caches.count(name) > 0) {
+        throw std::runtime_error("Duplicate cache name: " + name);
+      }
+      config.d_caches.emplace(name, filter);
+    });
+    return filter;
   });
 
-  luaCtx.writeFunction("newCuckooFilter", [](boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
+  luaCtx.writeFunction("newCuckooFilter", [](const std::string& name, boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
     unsigned int maxEntries{100000};
     unsigned int maxKicks{500};
     unsigned int bucketSize{4};
@@ -76,7 +93,15 @@ void setupLuaBindingsCache(LuaContext& luaCtx)
     getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "ttlBits", ttlBits);
     getOptionalIntegerValue<unsigned int>("newCuckooFilter", vars, "ttlResolution", ttlResolution);
 
-    return std::shared_ptr<cache_t>(new CuckooFilter({.d_maxKicks = maxKicks, .d_maxEntries = maxEntries, .d_bucketSize = bucketSize, .d_fingerprintBits = fingerprintBits, .d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_ttlBits = ttlBits, .d_ttlResolution = ttlResolution, .d_lruEnabled = lruEnabled}));
+    auto filter = std::shared_ptr<cache_t>(new CuckooFilter({.d_maxKicks = maxKicks, .d_maxEntries = maxEntries, .d_bucketSize = bucketSize, .d_fingerprintBits = fingerprintBits, .d_ttlEnabled = ttlEnabled, .d_ttl = ttl, .d_ttlBits = ttlBits, .d_ttlResolution = ttlResolution, .d_lruEnabled = lruEnabled}));
+
+    dnsdist::configuration::updateRuntimeConfiguration([name, &filter](dnsdist::configuration::RuntimeConfiguration& config) {
+      if (config.d_caches.count(name) > 0) {
+        throw std::runtime_error("Duplicate cache name: " + name);
+      }
+      config.d_caches.emplace(name, filter);
+    });
+    return filter;
   });
 
   luaCtx.registerFunction<boost::optional<std::string> (std::shared_ptr<cache_t>::*)(const std::string&)>("get", [](std::shared_ptr<cache_t>& cache, const std::string& key) {

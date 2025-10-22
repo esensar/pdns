@@ -543,6 +543,7 @@ public:
   CopyCache(unsigned int ttl) :
     d_ttl(ttl)
   {
+    d_stats.d_memoryUsed = sizeof(*this);
   }
   void insert(const std::string& key, std::string value) override;
   void insertKey(const std::string& key) override;
@@ -551,6 +552,7 @@ public:
   bool remove(const std::string& key) override;
   size_t purgeExpired(size_t upTo, const time_t now) override;
   size_t expunge(size_t upTo = 0) override;
+  [[nodiscard]] GenericCacheInterface<std::string, std::string>::Stats& getStats() override;
 
   bool needsUpdate();
   void insertBatch(std::unordered_map<std::string, std::string> batch);
@@ -559,6 +561,7 @@ private:
   SharedLockGuarded<std::unordered_map<std::string, std::string>> d_map{};
   const unsigned int d_ttl;
   unsigned int d_lastInsert;
+  GenericCacheInterface<std::string, std::string>::Stats d_stats{"filter=\"none\""};
 };
 
 class CopyCachingRedisClient : public RedisKVClientInterface
