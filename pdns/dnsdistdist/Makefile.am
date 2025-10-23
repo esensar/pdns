@@ -147,6 +147,7 @@ EXTRA_DIST=COPYING \
 	   portsmplexer.cc \
 	   cdb.cc cdb.hh \
 	   redis.cc redis.hh \
+	   redis-stats.hh \
 	   standalone_fuzz_target_runner.cc \
 	   ext/lmdb-safe/lmdb-safe.cc ext/lmdb-safe/lmdb-safe.hh \
 	   ext/protozero/include/* \
@@ -284,6 +285,7 @@ dnsdist_SOURCES = \
 	ext/luawrapper/include/LuaContext.hpp \
 	fstrm_logger.cc fstrm_logger.hh \
 	generic-cache.hh \
+	generic-cache-interface.hh \
 	gettime.cc gettime.hh \
 	htmlfiles.h \
 	iputils.cc iputils.hh \
@@ -389,6 +391,7 @@ testrunner_SOURCES = \
 	ednssubnet.cc ednssubnet.hh \
 	ext/luawrapper/include/LuaContext.hpp \
 	generic-cache.hh \
+	generic-cache-interface.hh \
 	gettime.cc gettime.hh \
 	iputils.cc iputils.hh \
 	misc.cc misc.hh \
@@ -493,8 +496,8 @@ endif
 if HAVE_REDIS
 dnsdist_LDADD += $(REDIS_LDFLAGS) $(REDIS_LIBS)
 testrunner_LDADD += $(REDIS_LDFLAGS) $(REDIS_LIBS)
-dnsdist_SOURCES += redis.cc redis.hh
-testrunner_SOURCES += redis.cc redis.hh
+dnsdist_SOURCES += redis.cc redis.hh redis-stats.hh
+testrunner_SOURCES += redis.cc redis.hh redis-stats.hh
 endif
 
 if HAVE_RE2
