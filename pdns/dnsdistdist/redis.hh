@@ -29,6 +29,7 @@
 #include <hiredis/hiredis.h>
 #include <memory>
 #include <string>
+#include "redis-stats.hh"
 
 class RedisClient;
 
@@ -619,21 +620,6 @@ private:
   std::shared_ptr<GenericFilterInterface<std::string>> d_copyCacheFilter;
   const unsigned int d_ttl;
   unsigned int d_lastInsert;
-};
-
-struct RedisStats
-{
-  RedisStats() {};
-  explicit RedisStats(std::string labels) :
-    d_labels(labels) {};
-
-  std::string d_labels{};
-
-  stat_t d_successfulRequests;
-  stat_t d_successfulLookups;
-  stat_t d_failedLookups;
-  stat_t d_copyCacheRefreshes;
-  stat_t d_errors;
 };
 
 class RedisKVClient : public RedisKVClientInterface

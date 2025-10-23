@@ -35,9 +35,10 @@
 #include "dnsdist-rule-chains.hh"
 #include "dnsdist-server-pool.hh"
 #include "generic-cache.hh"
+#include "generic-cache-interface.hh"
 #include "iputils.hh"
 #ifdef HAVE_REDIS
-#include "redis.hh"
+#include "redis-stats.hh"
 #endif /* HAVE_REDIS */
 
 class ServerPolicy;

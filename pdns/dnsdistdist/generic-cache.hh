@@ -32,7 +32,6 @@
 #include <cmath>
 #include <cstring>
 #include <iterator>
-#include <numeric>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
@@ -40,68 +39,13 @@
 #include <random>
 
 #include "cachecleaner.hh"
-#include "dnsdist.hh"
+#include "generic-cache-interface.hh"
 #include "gettime.hh"
 #include "lock.hh"
 #include "ext/probds/murmur3.h"
 #include "stable-bloom.hh"
 
 using namespace ::boost::multi_index;
-
-class GenericExpiringCacheInterface
-{
-public:
-  virtual ~GenericExpiringCacheInterface() {};
-  virtual size_t purgeExpired(size_t upTo, time_t now) = 0;
-  virtual size_t expunge(size_t upTo = 0) = 0;
-};
-
-template <typename K>
-class GenericFilterInterface : public GenericExpiringCacheInterface
-{
-public:
-  virtual ~GenericFilterInterface() {};
-  virtual void insertKey(const K& key) = 0;
-  virtual bool contains(const K& key) = 0;
-  virtual bool remove(const K& key) = 0;
-};
-
-template <typename K, typename V>
-class GenericCacheInterface : public GenericFilterInterface<K>
-{
-protected:
-  struct Stats
-  {
-    Stats() {}
-    explicit Stats(std::string labels) :
-      d_labels(labels) {}
-
-    stat_t d_memoryUsed{0};
-    stat_t d_cacheHits{0};
-    stat_t d_cacheMisses{0};
-    stat_t d_entriesCount{0};
-    stat_t d_kickedItems{0};
-    stat_t d_expiredItems{0};
-    std::string d_labels{};
-
-    Stats& operator+=(const Stats& rhs)
-    {
-      d_memoryUsed += rhs.d_memoryUsed;
-      d_cacheHits += d_cacheHits;
-      d_cacheMisses += d_cacheMisses;
-      d_entriesCount += d_entriesCount;
-      d_kickedItems += d_kickedItems;
-      d_expiredItems += d_expiredItems;
-      return *this;
-    }
-  };
-
-public:
-  virtual ~GenericCacheInterface() {};
-  virtual void insert(const K& key, V value) = 0;
-  virtual bool getValue(const K& key, V& value) = 0;
-  [[nodiscard]] virtual Stats& getStats() = 0;
-};
 
 template <typename K, typename V, typename Hash = std::hash<K>>
 class GenericCache : public GenericCacheInterface<K, V>, boost::noncopyable
