@@ -728,7 +728,6 @@ private:
       return false;
     }
 
-    // Lookup with minimal locking
     bool contains(Fingerprint fp, const CuckooSettings& settings, const timespec& now, stats_t& stats)
     {
       for (size_t i = 0; i < settings.d_bucketSize; ++i) {
@@ -759,7 +758,6 @@ private:
       return false;
     }
 
-    // Remove with lock
     bool remove(Fingerprint fp, const CuckooSettings& settings)
     {
       for (size_t i = 0; i < settings.d_bucketSize; ++i) {

@@ -404,6 +404,7 @@ testrunner_SOURCES = \
 	test-channel.cc \
 	test-connectionmanagement_hh.cc \
 	test-credentials_cc.cc \
+	test-cuckoo-filter.cc \
 	test-delaypipe_hh.cc \
 	test-dns_cc.cc \
 	test-dnscrypt_cc.cc \
@@ -465,6 +466,7 @@ testrunner_LDADD = \
 	$(BOOST_UNIT_TEST_FRAMEWORK_LIBS) \
 	$(FSTRM_LIBS) \
 	$(YAHTTP_LIBS) \
+	$(PROBDS_LIBS) \
 	$(LIBSODIUM_LIBS) \
 	$(LUA_LIBS) \
 	$(RT_LIBS) \
