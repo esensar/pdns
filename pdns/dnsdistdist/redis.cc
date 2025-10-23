@@ -416,6 +416,7 @@ bool CopyCache::needsUpdate()
 
 void CopyCache::insertBatch(std::unordered_map<std::string, std::string> batch)
 {
+  // TODO: if this turns out slow or blocks too much, try atomic replacement, since whole cache is replaced anyways
   auto map = d_map.write_lock();
 
   map->clear();
@@ -542,15 +543,18 @@ bool RedisKVClient::getValue(const std::string& key, std::string& value)
 
   if (reply->ok()) {
     value = reply->getValue();
+    d_stats->d_successfulRequests += 1;
     return true;
   }
 
   vinfolog("Error while looking up key '%s' from Redis: %s", key, reply->getError());
+  d_stats->d_errors += 1;
   return false;
 }
 
 std::unordered_map<std::string, std::string> RedisKVClient::generateCopyCache()
 {
+  d_stats->d_copyCacheRefreshes += 1;
   return d_lookupAction->generateCopyCache(*d_client);
 }
 
@@ -558,10 +562,12 @@ bool RedisKVClient::keyExists(const std::string& key)
 {
   auto reply = d_lookupAction->keyExists(*d_client, key);
   if (reply->ok()) {
+    d_stats->d_successfulRequests += 1;
     return reply->getValue();
   }
 
   vinfolog("Error while looking up key '%s' from Redis: %s", key, reply->getError());
+  d_stats->d_errors += 1;
   return false;
 }
 

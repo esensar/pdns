@@ -21,9 +21,7 @@
  */
 #pragma once
 
-#include "dolog.hh"
 #include "generic-cache.hh"
-#include "iputils.hh"
 #include "channel.hh"
 #include "lock.hh"
 #include <thread>
@@ -32,7 +30,6 @@
 #include <memory>
 #include <string>
 
-using cache_t = std::unordered_map<std::string, std::string>;
 class RedisClient;
 
 template <typename T>
@@ -329,6 +326,7 @@ public:
   }
   virtual bool getFromCopyCache(GenericCacheInterface<std::string, std::string>& cache, const std::string& key, std::string& value) const = 0;
   virtual std::unique_ptr<RedisReplyInterface<std::string>> getValue(const RedisClient& client, const std::string& key) const = 0;
+  // TODO: Error handling for copy cache!
   virtual std::unordered_map<std::string, std::string> generateCopyCache(const RedisClient& client) const = 0;
   virtual std::unique_ptr<RedisReplyInterface<bool>> keyExists(const RedisClient& client, const std::string& key) const = 0;
 
@@ -423,6 +421,11 @@ public:
 
   redisReply* executeCommand(const char* format, ...) const;
 
+  const YaHTTP::URL& getUrl() const
+  {
+    return d_executor->getUrl();
+  }
+
 private:
   class RedisConnection
   {
@@ -440,6 +443,11 @@ private:
       return connection->get() == nullptr || connection->get()->err != 0;
     }
 
+    const YaHTTP::URL& getUrl() const
+    {
+      return d_url;
+    }
+
   private:
     mutable LockGuarded<std::unique_ptr<redisContext, decltype(&redisFree)>> d_context{std::unique_ptr<redisContext, decltype(&redisFree)>(nullptr, redisFree)};
     YaHTTP::URL d_url;
@@ -450,6 +458,7 @@ private:
   public:
     virtual ~Executor() = default;
     virtual redisReply* executeCommand(const char* format, va_list ap) const = 0;
+    virtual const YaHTTP::URL& getUrl() const = 0;
   };
 
   class DirectExecutor : public Executor
@@ -461,6 +470,11 @@ private:
     }
     redisReply* executeCommand(const char* format, va_list ap) const override;
 
+    const YaHTTP::URL& getUrl() const override
+    {
+      return d_connection.getUrl();
+    }
+
   private:
     RedisConnection d_connection;
   };
@@ -471,6 +485,11 @@ private:
     PipelineExecutor(const std::string& url, uint32_t pipelineInterval);
     ~PipelineExecutor();
     redisReply* executeCommand(const char* format, va_list ap) const override;
+
+    const YaHTTP::URL& getUrl() const override
+    {
+      return d_connection.getUrl();
+    }
 
   private:
     void maintenanceThread();
@@ -537,6 +556,7 @@ private:
   std::shared_ptr<GenericFilterInterface<std::string>> d_negativeCache;
 };
 
+// TODO: consider trie storage here
 class CopyCache : public GenericCacheInterface<std::string, std::string>
 {
 public:
@@ -601,11 +621,28 @@ private:
   unsigned int d_lastInsert;
 };
 
+struct RedisStats
+{
+  RedisStats() {};
+  explicit RedisStats(std::string labels) :
+    d_labels(labels) {};
+
+  std::string d_labels{};
+
+  stat_t d_successfulRequests;
+  stat_t d_successfulLookups;
+  stat_t d_failedLookups;
+  stat_t d_copyCacheRefreshes;
+  stat_t d_errors;
+};
+
 class RedisKVClient : public RedisKVClientInterface
 {
 public:
-  RedisKVClient(const std::shared_ptr<RedisClient>& client, std::unique_ptr<RedisLookupAction> lookupAction = std::make_unique<RedisGetLookupAction>()) :
-    d_client(client), d_lookupAction(std::move(lookupAction))
+  // TODO: use something else for data-name label maybe?
+  // TODO: maybe take in the stats reference for simpler labels setup?
+  RedisKVClient(const std::shared_ptr<RedisClient>& client, std::unique_ptr<RedisLookupAction> lookupAction, std::shared_ptr<RedisStats> stats) :
+    d_client(client), d_lookupAction(std::move(lookupAction)), d_stats(stats)
   {
   }
 
@@ -614,6 +651,8 @@ public:
   bool keyExists(const std::string& key) override;
 
 private:
-  std::shared_ptr<RedisClient> d_client;
+  std::shared_ptr<RedisClient>
+    d_client;
   std::unique_ptr<RedisLookupAction> d_lookupAction;
+  std::shared_ptr<RedisStats> d_stats;
 };

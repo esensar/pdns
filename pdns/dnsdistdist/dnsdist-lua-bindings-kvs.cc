@@ -22,6 +22,7 @@
 #include "dnsdist.hh"
 #include "dnsdist-kvs.hh"
 #include "dnsdist-lua.hh"
+#include <memory>
 
 void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] bool client)
 {
@@ -53,7 +54,7 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     std::shared_ptr<GenericCacheInterface<std::string, std::string>> negativeCache;
     std::shared_ptr<GenericCacheInterface<std::string, std::string>> copyCacheFilter;
     bool copyCacheEnabled{false};
-    unsigned int copyCacheTtl;
+    unsigned int copyCacheTtl{0};
     boost::optional<std::string> lookupAction;
     boost::optional<std::string> dataName;
     getOptionalValue<std::shared_ptr<GenericCacheInterface<std::string, std::string>>>(vars, "resultCache", resultCache);
@@ -65,7 +66,19 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     getOptionalValue<std::string>(vars, "lookupAction", lookupAction);
 
     checkAllParametersConsumed("newRedisKVStore", vars);
-    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisClient, lookupAction, dataName, copyCacheEnabled, copyCacheTtl, resultCache, negativeCache, copyCacheFilter));
+
+    std::string uniqueId = "url=" + redisClient->getUrl().to_string() + ",action=" + lookupAction.get_value_or("GET") + ",data-name=" + dataName.get_value_or("") + ",copy-cache=" + (copyCacheEnabled ? "true" : "false") + ",";
+    std::string labels = "redis-server=" + redisClient->getUrl().host + ":" + std::to_string(redisClient->getUrl().port) + ",redis-action=" + lookupAction.get_value_or("GET") + ",data-name=" + dataName.get_value_or("") + ",copy-cache=" + (copyCacheEnabled ? "true" : "false");
+    std::shared_ptr<RedisStats> stats = std::make_shared<RedisStats>(labels);
+
+    dnsdist::configuration::updateRuntimeConfiguration([uniqueId, &stats](dnsdist::configuration::RuntimeConfiguration& config) {
+      if (config.d_redisStats.count(uniqueId) > 0) {
+        throw std::runtime_error("Duplicate redis instance. Combination of arguments has to be unique!");
+      }
+      config.d_redisStats.emplace(uniqueId, std::shared_ptr(stats));
+    });
+
+    return std::shared_ptr<KeyValueStore>(new RedisKVStore(redisClient, lookupAction, dataName, copyCacheEnabled, copyCacheTtl, resultCache, negativeCache, copyCacheFilter, stats));
   });
 #endif /* HAVE_REDIS */
 
