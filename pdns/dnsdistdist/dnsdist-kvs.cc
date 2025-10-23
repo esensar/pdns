@@ -287,7 +287,8 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter)
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
+  d_stats(stats)
 {
   std::unique_ptr<RedisLookupAction> command;
   if (lookupAction && !boost::iequals(lookupAction.get(), "get")) {
@@ -315,7 +316,7 @@ RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boos
       command = std::make_unique<RedisGetLookupAction>();
     }
   }
-  d_redis = std::make_unique<RedisKVClient>(redisClient, std::move(command));
+  d_redis = std::make_unique<RedisKVClient>(redisClient, std::move(command), stats);
   if (negativeCache) {
     d_redis = std::make_unique<NegativeCachingRedisClient>(std::move(d_redis), negativeCache);
   }
@@ -339,12 +340,26 @@ bool RedisKVStore::reload()
 
 bool RedisKVStore::getValue(const std::string& key, std::string& value)
 {
-  return d_redis->getValue(key, value);
+  auto result = d_redis->getValue(key, value);
+  if (result) {
+    d_stats->d_successfulLookups += 1;
+  }
+  else {
+    d_stats->d_failedLookups += 1;
+  }
+  return result;
 }
 
 bool RedisKVStore::keyExists(const std::string& key)
 {
-  return d_redis->keyExists(key);
+  auto result = d_redis->keyExists(key);
+  if (result) {
+    d_stats->d_successfulLookups += 1;
+  }
+  else {
+    d_stats->d_failedLookups += 1;
+  }
+  return result;
 }
 
 #endif // HAVE_REDIS

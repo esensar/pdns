@@ -254,6 +254,35 @@ static bool doOneCarbonExport(const Carbon::Endpoint& endpoint)
           << " " << stats.d_kickedItems << " " << now << "\r\n";
     }
 
+#ifdef HAVE_REDIS
+    for (const auto& entry : dnsdist::configuration::getCurrentRuntimeConfiguration().d_redisStats) {
+      string cacheName = entry.first;
+      std::replace(cacheName.begin(), cacheName.end(), '.', '_');
+      if (cacheName.empty()) {
+        cacheName = "_default_";
+      }
+      string base = namespace_name;
+      base += ".";
+      base += hostname;
+      base += ".";
+      base += instance_name;
+      base += ".redis.";
+      base += cacheName;
+      base += ".";
+      const std::shared_ptr<RedisStats> stats = entry.second;
+      str << base << "successful-requests"
+          << " " << stats->d_successfulRequests << " " << now << "\r\n";
+      str << base << "errors"
+          << " " << stats->d_errors << " " << now << "\r\n";
+      str << base << "successful"
+          << " " << stats->d_successfulLookups << " " << now << "\r\n";
+      str << base << "failed"
+          << " " << stats->d_failedLookups << " " << now << "\r\n";
+      str << base << "copy_cache_refreshes"
+          << " " << stats->d_copyCacheRefreshes << " " << now << "\r\n";
+    }
+#endif /* HAVE_REDIS */
+
 #ifdef HAVE_DNS_OVER_HTTPS
     {
       std::map<std::string, uint64_t> dohFrontendDuplicates;

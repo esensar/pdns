@@ -19,6 +19,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
+#include <memory>
 #include <stdexcept>
 
 #include "dnsdist-configuration-yaml.hh"
@@ -1860,7 +1861,7 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
       if (redis.negative_cache_enabled) {
         negativeCache = std::make_shared<GenericCache<std::string, std::string>>(GenericCache<std::string, std::string>::CacheSettings{.d_ttlEnabled = false, .d_ttl = 0, .d_lruEnabled = false});
       }
-      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache, copyCacheFilter));
+      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache, copyCacheFilter, std::make_shared<RedisStats>()));
       dnsdist::configuration::yaml::registerType<KeyValueStore>(store, redis.name);
     }
     else {

@@ -921,6 +921,30 @@ static void handlePrometheus(const YaHTTP::Request& req, YaHTTP::Response& resp)
     output << genericcachebase << "kicked" << label << " " << stats.d_kickedItems << "\n";
   }
 
+#ifdef HAVE_REDIS
+  const string redisbase = "dnsdist_rediskvstore_";
+  output << "# HELP dnsdist_rediskvstore_successful_requests " << "Number of successful requests against redis" << "\n";
+  output << "# TYPE dnsdist_rediskvstore_successful_requests " << "counter" << "\n";
+  output << "# HELP dnsdist_rediskvstore_errors " << "Number of redis errors" << "\n";
+  output << "# TYPE dnsdist_rediskvstore_errors " << "counter" << "\n";
+  output << "# HELP dnsdist_rediskvstore_successful " << "Number of successful lookups (including cache)" << "\n";
+  output << "# TYPE dnsdist_rediskvstore_successful " << "counter" << "\n";
+  output << "# HELP dnsdist_rediskvstore_failed " << "Number of failed lookups (including cache)" << "\n";
+  output << "# TYPE dnsdist_rediskvstore_failed " << "counter" << "\n";
+  output << "# HELP dnsdist_rediskvstore_copy_cache_refreshes " << "Number of refreshes of the copy cache" << "\n";
+  output << "# TYPE dnsdist_rediskvstore_copy_cache_refreshes " << "counter" << "\n";
+  for (const auto& entry : dnsdist::configuration::getCurrentRuntimeConfiguration().d_redisStats) {
+    const std::shared_ptr<RedisStats> stats = entry.second;
+
+    const string label = "{" + stats->d_labels + "}";
+
+    output << redisbase << "successful_requests" << label << " " << stats->d_successfulRequests << "\n";
+    output << redisbase << "errors" << label << " " << stats->d_errors << "\n";
+    output << redisbase << "successful" << label << " " << stats->d_successfulLookups << "\n";
+    output << redisbase << "failed" << label << " " << stats->d_failedLookups << "\n";
+    output << redisbase << "copy_cache_refreshses" << label << " " << stats->d_copyCacheRefreshes << "\n";
+  }
+
   output << "# HELP dnsdist_rule_hits " << "Number of hits of that rule" << "\n";
   output << "# TYPE dnsdist_rule_hits " << "counter" << "\n";
   const auto& chains = dnsdist::configuration::getCurrentRuntimeConfiguration().d_ruleChains;
@@ -932,6 +956,7 @@ static void handlePrometheus(const YaHTTP::Request& req, YaHTTP::Response& resp)
     const auto& chain = dnsdist::rules::getResponseRuleChain(chains, chainDescription.identifier);
     addRulesToPrometheusOutput(output, chain);
   }
+#endif /* HAVE_REDIS */
 
 #ifndef DISABLE_DYNBLOCKS
   output << "# HELP dnsdist_dynblocks_nmg_top_offenders_hits_per_second " << "Number of hits per second blocked by Dynamic Blocks (netmasks) for the top offenders, averaged over the last 60s" << "\n";

@@ -36,6 +36,9 @@
 #include "dnsdist-server-pool.hh"
 #include "generic-cache.hh"
 #include "iputils.hh"
+#ifdef HAVE_REDIS
+#include "redis.hh"
+#endif /* HAVE_REDIS */
 
 class ServerPolicy;
 struct ServerPool;
@@ -122,6 +125,9 @@ struct RuntimeConfiguration
 #endif /* DISABLE_CARBON */
   std::unordered_map<std::string, ServerPool> d_pools;
   std::unordered_map<std::string, std::shared_ptr<GenericCacheInterface<std::string, std::string>>> d_caches;
+#ifdef HAVE_REDIS
+  std::unordered_map<std::string, std::shared_ptr<RedisStats>> d_redisStats;
+#endif /* HAVE_REDIS */
   std::shared_ptr<const CredentialsHolder> d_webPassword;
   std::shared_ptr<const CredentialsHolder> d_webAPIKey;
   std::optional<std::unordered_map<std::string, std::string>> d_webCustomHeaders;

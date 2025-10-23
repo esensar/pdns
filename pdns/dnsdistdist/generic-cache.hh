@@ -527,6 +527,7 @@ private:
   GenericCacheInterface<std::string, std::string>::Stats d_stats{"filter=\"bloom\""};
 };
 
+// TODO: method naming more like rest of PDNS
 class CuckooFilter : public GenericCacheInterface<std::string, std::string>
 {
 public:
