@@ -534,7 +534,13 @@ public:
     timespec now;
     gettime(&now);
 
-    if (d_buckets[i1].lock()->insert(fp, d_settings, now, d_stats) || d_buckets[i2].lock()->insert(fp, d_settings, now, d_stats)) {
+    auto inserted = d_buckets[i1].lock()->insert(fp, d_settings, now, d_stats);
+
+    if (!inserted) {
+      inserted = d_buckets[i2].lock()->insert(fp, d_settings, now, d_stats);
+    }
+
+    if (inserted) {
       return;
     }
 
@@ -557,7 +563,7 @@ public:
       }
       cur_index = alt_index(cur_index, cur_fp);
 
-      if (d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now, d_stats) || d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now, d_stats)) {
+      if (d_buckets[cur_index].lock()->insert(cur_fp, d_settings, now, d_stats)) {
         // TODO: counter is lost here and reset to 1 - probably not good
         return;
       }
@@ -578,7 +584,10 @@ public:
     timespec now;
     gettime(&now);
 
-    auto result = d_buckets[i1].lock()->contains(fp, d_settings, now, d_stats) || d_buckets[i2].lock()->contains(fp, d_settings, now, d_stats);
+    auto result = d_buckets[i1].lock()->contains(fp, d_settings, now, d_stats);
+    if (!result) {
+      result = d_buckets[i2].lock()->contains(fp, d_settings, now, d_stats);
+    }
 
     if (result) {
       d_stats.d_cacheHits += 1;
@@ -594,7 +603,11 @@ public:
   {
     auto [i1, i2, fp] = get_indices_and_fingerprint(key);
 
-    auto removed = d_buckets[i1].lock()->remove(fp, d_settings) || d_buckets[i2].lock()->remove(fp, d_settings);
+    auto removed = d_buckets[i1].lock()->remove(fp, d_settings);
+
+    if (!removed) {
+      removed = d_buckets[i2].lock()->remove(fp, d_settings);
+    }
 
     if (removed) {
       d_stats.d_entriesCount -= 1;
