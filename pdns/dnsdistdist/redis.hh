@@ -573,7 +573,7 @@ public:
   bool remove(const std::string& key) override;
   size_t purgeExpired(size_t upTo, const time_t now) override;
   size_t expunge(size_t upTo = 0) override;
-  [[nodiscard]] GenericCacheInterface<std::string, std::string>::Stats& getStats() override;
+  [[nodiscard]] const GenericCacheInterface<std::string, std::string>::Stats& getStats() const override;
 
   bool needsUpdate();
   void insertBatch(std::unordered_map<std::string, std::string> batch);

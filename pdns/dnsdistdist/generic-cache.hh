@@ -353,7 +353,7 @@ public:
     return removed;
   }
 
-  [[nodiscard]] virtual typename GenericCacheInterface<K, V>::Stats& getStats() override
+  [[nodiscard]] virtual const typename GenericCacheInterface<K, V>::Stats& getStats() const override
   {
     return d_stats;
   }
@@ -460,7 +460,7 @@ public:
     return 0;
   }
 
-  [[nodiscard]] virtual GenericCacheInterface<std::string, std::string>::Stats& getStats() override
+  [[nodiscard]] virtual const GenericCacheInterface<std::string, std::string>::Stats& getStats() const override
   {
     return d_stats;
   }
@@ -632,7 +632,7 @@ public:
     return 0;
   }
 
-  [[nodiscard]] virtual GenericCacheInterface<std::string, std::string>::Stats& getStats() override
+  [[nodiscard]] virtual const GenericCacheInterface<std::string, std::string>::Stats& getStats() const override
   {
     return d_stats;
   }
