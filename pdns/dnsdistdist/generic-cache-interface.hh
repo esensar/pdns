@@ -75,5 +75,5 @@ public:
   virtual ~GenericCacheInterface() {};
   virtual void insert(const K& key, V value) = 0;
   virtual bool getValue(const K& key, V& value) = 0;
-  [[nodiscard]] virtual Stats& getStats() = 0;
+  [[nodiscard]] virtual const Stats& getStats() const = 0;
 };

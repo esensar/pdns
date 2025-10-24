@@ -469,7 +469,7 @@ size_t CopyCache::expunge([[maybe_unused]] size_t upTo)
   }
 };
 
-[[nodiscard]] GenericCacheInterface<std::string, std::string>::Stats& CopyCache::getStats()
+[[nodiscard]] const GenericCacheInterface<std::string, std::string>::Stats& CopyCache::getStats() const
 {
   return d_stats;
 };
