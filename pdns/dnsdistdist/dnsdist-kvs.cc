@@ -287,30 +287,30 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std::optional<std::string> lookupAction, std::optional<std::string> dataName, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
   d_stats(stats)
 {
   std::unique_ptr<RedisLookupAction> command;
-  if (lookupAction && !boost::iequals(lookupAction.get(), "get")) {
+  if (lookupAction && !boost::iequals(lookupAction.value(), "get")) {
     if (!dataName) {
-      throw std::runtime_error("Option 'dataName' is required for lookup action " + lookupAction.get());
+      throw std::runtime_error("Option 'dataName' is required for lookup action " + lookupAction.value());
     }
-    if (boost::iequals(lookupAction.get(), "hget")) {
-      command = std::make_unique<RedisHGetLookupAction>(dataName.get());
+    if (boost::iequals(lookupAction.value(), "hget")) {
+      command = std::make_unique<RedisHGetLookupAction>(dataName.value());
     }
-    else if (boost::iequals(lookupAction.get(), "sismember")) {
-      command = std::make_unique<RedisSismemberLookupAction>(dataName.get());
+    else if (boost::iequals(lookupAction.value(), "sismember")) {
+      command = std::make_unique<RedisSismemberLookupAction>(dataName.value());
     }
-    else if (boost::iequals(lookupAction.get(), "sscan")) {
-      command = std::make_unique<RedisSscanLookupAction>(dataName.get());
+    else if (boost::iequals(lookupAction.value(), "sscan")) {
+      command = std::make_unique<RedisSscanLookupAction>(dataName.value());
     }
     else {
-      throw std::runtime_error("Unknown lookup action: " + lookupAction.get());
+      throw std::runtime_error("Unknown lookup action: " + lookupAction.value());
     }
   }
   else {
     if (dataName) {
-      command = std::make_unique<RedisGetLookupAction>(dataName.get());
+      command = std::make_unique<RedisGetLookupAction>(dataName.value());
     }
     else {
       command = std::make_unique<RedisGetLookupAction>();

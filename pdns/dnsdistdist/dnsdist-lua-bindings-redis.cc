@@ -19,7 +19,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#include "dnsdist.hh"
 #include "dnsdist-lua.hh"
 #include <memory>
 #ifdef HAVE_REDIS
@@ -29,7 +28,7 @@
 void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] bool client)
 {
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
+  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, std::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
     if (client) {
       return std::shared_ptr<RedisClient>(nullptr);
     }
