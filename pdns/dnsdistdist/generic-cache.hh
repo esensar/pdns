@@ -29,12 +29,13 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index/key_extractors.hpp>
-#include <cmath>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 #include <vector>
 #include <random>
 

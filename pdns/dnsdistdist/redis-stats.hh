@@ -22,7 +22,7 @@
 #pragma once
 
 #include <string>
-#include "dnsdist.hh"
+#include "stat_t.hh"
 
 struct RedisStats
 {
@@ -32,9 +32,9 @@ struct RedisStats
 
   std::string d_labels{};
 
-  stat_t d_successfulRequests;
-  stat_t d_successfulLookups;
-  stat_t d_failedLookups;
-  stat_t d_copyCacheRefreshes;
-  stat_t d_errors;
+  pdns::stat_t d_successfulRequests;
+  pdns::stat_t d_successfulLookups;
+  pdns::stat_t d_failedLookups;
+  pdns::stat_t d_copyCacheRefreshes;
+  pdns::stat_t d_errors;
 };

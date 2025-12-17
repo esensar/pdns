@@ -21,7 +21,10 @@
  */
 #pragma once
 
-#include "dnsdist.hh"
+#include "stat_t.hh"
+#include <cstddef>
+#include <ctime>
+#include <string>
 
 class GenericExpiringCacheInterface
 {
@@ -51,12 +54,12 @@ protected:
     explicit Stats(std::string labels) :
       d_labels(labels) {}
 
-    stat_t d_memoryUsed{0};
-    stat_t d_cacheHits{0};
-    stat_t d_cacheMisses{0};
-    stat_t d_entriesCount{0};
-    stat_t d_kickedItems{0};
-    stat_t d_expiredItems{0};
+    pdns::stat_t d_memoryUsed{0};
+    pdns::stat_t d_cacheHits{0};
+    pdns::stat_t d_cacheMisses{0};
+    pdns::stat_t d_entriesCount{0};
+    pdns::stat_t d_kickedItems{0};
+    pdns::stat_t d_expiredItems{0};
     std::string d_labels{};
 
     Stats& operator+=(const Stats& rhs)
