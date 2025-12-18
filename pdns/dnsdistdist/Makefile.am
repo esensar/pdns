@@ -502,6 +502,13 @@ dnsdist_SOURCES += redis.cc redis.hh redis-stats.hh
 testrunner_SOURCES += redis.cc redis.hh redis-stats.hh
 endif
 
+if HAVE_MMDB
+dnsdist_LDADD += $(MMDB_LDFLAGS) $(MMDB_LIBS)
+testrunner_LDADD += $(MMDB_LDFLAGS) $(MMDB_LIBS)
+dnsdist_SOURCES += mmdb.cc mmdb.hh
+testrunner_SOURCES += mmdb.cc mmdb.hh
+endif
+
 if HAVE_RE2
 dnsdist_LDADD += $(RE2_LIBS)
 testrunner_LDADD += $(RE2_LIBS)

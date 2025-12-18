@@ -3077,6 +3077,9 @@ static void reportFeatures()
 #ifdef HAVE_LMDB
   cout << "lmdb ";
 #endif
+#ifdef HAVE_MMDB
+  cout << "mmdb ";
+#endif
 #ifndef DISABLE_PROTOBUF
   cout << "protobuf ";
 #endif
