@@ -28,6 +28,16 @@ AC_DEFINE_UNQUOTED([DNSDIST_CONFIG_ARGS],
   [pdns configure arguments]
 )
 
+AC_CHECK_HEADERS(
+	[sys/mman.h],
+	[AC_CHECK_FUNC(
+		[mmap],
+		[AC_DEFINE(HAVE_MMAP, [1], [Define to 1 if you have mmap])],
+		[have_mmap=no]
+	)],
+	[have_mmap=no]
+)
+
 PDNS_WITH_LIBSODIUM
 PDNS_WITH_QUICHE
 PDNS_CHECK_DNSTAP([auto])
