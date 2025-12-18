@@ -7,7 +7,7 @@ project(
   meson_version: '>= 1.3.0',
   default_options: [
     'buildtype=debugoptimized',
-    'warning_level=2',          # TODO Move this to 3 to enable -Wpedantic
+    'warning_level=2', # TODO Move this to 3 to enable -Wpedantic
     'cpp_std=c++17',
     'b_pie=true',
   ],
@@ -20,7 +20,6 @@ meson.add_dist_script('version.sh', 'set-dist', meson.project_version())
 
 add_project_arguments('-DDNSDIST', language: 'cpp')
 
-
 product_source_dir = meson.current_source_dir()
 product_build_dir = meson.current_build_dir()
 summary('Source Dir', product_source_dir, section: 'Build')
@@ -28,64 +27,69 @@ summary('Build Dir', product_build_dir, section: 'Build')
 
 # Create the configuration object and dependencies list.
 conf = configuration_data()
-conf.set_quoted('PACKAGE_STRING', 'dnsdist ' + meson.project_version(), description: 'dnsdist version')
+conf.set_quoted(
+  'PACKAGE_STRING',
+  'dnsdist ' + meson.project_version(),
+  description: 'dnsdist version',
+)
 conf.set_quoted('PACKAGE_VERSION', meson.project_version(), description: 'version')
 
 # Feature detection and system configuration
-subdir('meson' / 'config')                  # Config
-subdir('meson' / 'version')                 # Generate version define
-subdir('meson' / 'compiler-setup')          # Common compiler setup
-subdir('meson' / 'dlopen')                  # our Rust static library needs dlopen (needs to happen _after_ compiler-setup)
-subdir('meson' / 'summary')                 # Print a system/project summary
-subdir('meson' / 'sysconfdir')              # Sysconfdir
-subdir('meson' / 'platform')                # Platform detection
-subdir('meson' / 'atomics')                 # Check atomics support
-subdir('meson' / 'pthread-headers')         # Check pthread headers
-subdir('meson' / 'pthread-setname')         # Pthread setname madness
-subdir('meson' / 'pthread-np')              # Pthread _np functions
-subdir('meson' / 'strerror')                # Strerror_r
-subdir('meson' / 'lua')                     # Lua
-subdir('meson' / 'hardening')               # Hardening
-subdir('meson' / 'net-libs')                # Network Libraries
-subdir('meson' / 'tm-gmtoff')               # Check for tm_gmtoff field in struct tm
-subdir('meson' / 'mmap')                    # Check for mmap
-subdir('meson' / 'libcap')                  # Libcap to drop capabilities
-subdir('meson' / 'libedit')                 # Libedit
-subdir('meson' / 'libsodium')               # Libsodium
-subdir('meson' / 'libcrypto')               # OpenSSL libcrypto
-subdir('meson' / 'libssl')                  # OpenSSL libssl
-subdir('meson' / 'libssl-engines')          # OpenSSL libssl engines
-subdir('meson' / 'libssl-providers')        # OpenSSL libssl providers
-subdir('meson' / 'libsnmp')                 # SNMP
-subdir('meson' / 'clock-gettime')           # Clock_gettime
-subdir('meson' / 'boost')                   # Boost
-subdir('meson' / 'boost-test')              # Boost Testing Library
-subdir('meson' / 'reproducible')            # Reproducible Builds
-subdir('meson' / 'libsystemd')              # Systemd notification
-subdir('meson' / 'systemd')                 # Systemd and unit file handling
-subdir('meson' / 'code-coverage')           # Code coverage
-subdir('meson' / 'auto-var-init')           # Automatic Variable Initialization
-subdir('meson' / 'sanitizers')              # Sanitizers
-subdir('meson' / 'various-functions')       # Various Functions
-subdir('meson' / 'various-headers')         # Various Headers
-subdir('meson' / 'dnstap')                  # DNSTAP through libfstream
-subdir('meson' / 'dnscrypt')                # DNSCrypt through libsodium
-subdir('meson' / 'ipcipher')                # IPCipher (requires libcrypto)
-subdir('meson' / 'cdb')                     # CDB
-subdir('meson' / 'ebpf')                    # eBPF
-subdir('meson' / 'gnutls')                  # GNUTLS
-subdir('meson' / 'h2o')                     # H2O
-subdir('meson' / 'lmdb')                    # LMDB
-subdir('meson' / 'nghttp2')                 # NGHTTP2
-subdir('meson' / 'quiche')                  # Quiche
-subdir('meson' / 're2')                     # RE2
-subdir('meson' / 'xsk')                     # BPF and XDP for XSK
-subdir('meson' / 'dot')                     # DNS over TLS
-subdir('meson' / 'doh2')                    # DNS over HTTP/2
-subdir('meson' / 'doq')                     # DNS over QUIC
-subdir('meson' / 'doh3')                    # DNS over HTTP/3
-subdir('meson' / 'yaml-configuration')      # YAML configuration
-subdir('meson' / 'redis')                   # Redis
+subdir('meson' / 'config') # Config
+subdir('meson' / 'version') # Generate version define
+subdir('meson' / 'compiler-setup') # Common compiler setup
+subdir('meson' / 'dlopen') # our Rust static library needs dlopen (needs to happen _after_ compiler-setup)
+subdir('meson' / 'summary') # Print a system/project summary
+subdir('meson' / 'sysconfdir') # Sysconfdir
+subdir('meson' / 'platform') # Platform detection
+subdir('meson' / 'atomics') # Check atomics support
+subdir('meson' / 'pthread-headers') # Check pthread headers
+subdir('meson' / 'pthread-setname') # Pthread setname madness
+subdir('meson' / 'pthread-np') # Pthread _np functions
+subdir('meson' / 'strerror') # Strerror_r
+subdir('meson' / 'lua') # Lua
+subdir('meson' / 'hardening') # Hardening
+subdir('meson' / 'net-libs') # Network Libraries
+subdir('meson' / 'tm-gmtoff') # Check for tm_gmtoff field in struct tm
+subdir('meson' / 'mmap') # Check for mmap
+subdir('meson' / 'libcap') # Libcap to drop capabilities
+subdir('meson' / 'libedit') # Libedit
+subdir('meson' / 'libsodium') # Libsodium
+subdir('meson' / 'libcrypto') # OpenSSL libcrypto
+subdir('meson' / 'libssl') # OpenSSL libssl
+subdir('meson' / 'libssl-engines') # OpenSSL libssl engines
+subdir('meson' / 'libssl-providers') # OpenSSL libssl providers
+subdir('meson' / 'libsnmp') # SNMP
+subdir('meson' / 'clock-gettime') # Clock_gettime
+subdir('meson' / 'boost') # Boost
+subdir('meson' / 'boost-test') # Boost Testing Library
+subdir('meson' / 'reproducible') # Reproducible Builds
+subdir('meson' / 'libsystemd') # Systemd notification
+subdir('meson' / 'systemd') # Systemd and unit file handling
+subdir('meson' / 'code-coverage') # Code coverage
+subdir('meson' / 'auto-var-init') # Automatic Variable Initialization
+subdir('meson' / 'sanitizers') # Sanitizers
+subdir('meson' / 'various-functions') # Various Functions
+subdir('meson' / 'various-headers') # Various Headers
+subdir('meson' / 'dnstap') # DNSTAP through libfstream
+subdir('meson' / 'dnscrypt') # DNSCrypt through libsodium
+subdir('meson' / 'ipcipher') # IPCipher (requires libcrypto)
+subdir('meson' / 'cdb') # CDB
+subdir('meson' / 'ebpf') # eBPF
+subdir('meson' / 'gnutls') # GNUTLS
+subdir('meson' / 'h2o') # H2O
+subdir('meson' / 'lmdb') # LMDB
+subdir('meson' / 'nghttp2') # NGHTTP2
+subdir('meson' / 'quiche') # Quiche
+subdir('meson' / 're2') # RE2
+subdir('meson' / 'xsk') # BPF and XDP for XSK
+subdir('meson' / 'dot') # DNS over TLS
+subdir('meson' / 'doh2') # DNS over HTTP/2
+subdir('meson' / 'doq') # DNS over QUIC
+subdir('meson' / 'doh3') # DNS over HTTP/3
+subdir('meson' / 'yaml-configuration') # YAML configuration
+subdir('meson' / 'redis') # Redis
+subdir('meson' / 'mmdb') # MMDB (MaxmindDB)
 
 common_sources = []
 
@@ -233,13 +237,13 @@ conditional_sources = {
       src_dir / 'doh.cc',
     ],
     'condition': dep_libh2o_evloop.found(),
-   },
+  },
   'doq': {
     'sources': [
       src_dir / 'doq.cc',
     ],
     'condition': get_option('dns-over-quic').allowed() and dep_libquiche.found(),
-   },
+  },
   'ipcipher': {
     'sources': [
       src_dir / 'ipcipher.cc',
@@ -251,16 +255,22 @@ conditional_sources = {
       src_dir / 'doq-common.cc',
     ],
     'condition': dep_libquiche.found(),
-   },
+  },
   'redis': {
     'sources': [
       src_dir / 'redis.cc',
     ],
     'condition': get_option('redis').allowed() and dep_redis.found(),
   },
+  'mmdb': {
+    'sources': [
+      src_dir / 'mmdb.cc',
+    ],
+    'condition': get_option('mmdb').allowed() and dep_mmdb.found(),
+  },
 }
 
-foreach name, info: conditional_sources
+foreach name, info : conditional_sources
   if info['condition']
     common_sources += files(info['sources'])
   endif
@@ -289,14 +299,12 @@ config_h = configure_file(configuration: conf, output: 'config.h')
 
 sh_program = find_program('sh')
 dep_no_config_in_source_check = custom_target(
-    input: [],
-    output: ['check absence of config.h file in source directory'],
-    command: [sh_program, '-c', 'test ! -e @SOURCE_ROOT@/config.h'],
-    build_always_stale: true,
+  input: [],
+  output: ['check absence of config.h file in source directory'],
+  command: [sh_program, '-c', 'test ! -e @SOURCE_ROOT@/config.h'],
+  build_always_stale: true,
 )
-dep_no_config_in_source = declare_dependency(
-  sources: dep_no_config_in_source_check
-)
+dep_no_config_in_source = declare_dependency(sources: dep_no_config_in_source_check)
 
 html_sources = [
   src_dir / 'html/index.html',
@@ -318,7 +326,7 @@ htmlfiles = custom_target(
   command: [incfiles, '@SOURCE_ROOT@'],
   input: html_sources,
   output: 'htmlfiles.h',
-  capture: true
+  capture: true,
 )
 
 dep_htmlfiles = declare_dependency(
@@ -330,7 +338,7 @@ ffi_interface = custom_target(
   command: [generate_ffi_interface, '@INPUT@'],
   input: ['dnsdist-lua-ffi-interface.h', 'dnsdist-lua-inspection-ffi.h'],
   output: 'dnsdist-lua-ffi-interface.inc',
-  capture: true
+  capture: true,
 )
 
 dep_ffi_interface = declare_dependency(
@@ -376,7 +384,7 @@ yaml_settings_docs = custom_target(
     'dnsdist-settings-definitions.yml',
     'dnsdist-actions-definitions.yml',
     'dnsdist-response-actions-definitions.yml',
-    'dnsdist-selectors-definitions.yml'
+    'dnsdist-selectors-definitions.yml',
   ],
   output: '.yaml-settings.stamp',
 )
@@ -410,6 +418,7 @@ deps = [
   dep_lmdb,
   dep_lmdb_safe,
   dep_lua,
+  dep_mmdb,
   dep_protozero,
   dep_yahttp,
   dep_libre2,
@@ -422,7 +431,7 @@ deps = [
 ]
 
 libdnsdist_dnslabeltext_source = src_dir / 'dnslabeltext.rl'
-libdnsdist_dnslabeltext_gen    = src_dir / 'dnslabeltext.cc'
+libdnsdist_dnslabeltext_gen = src_dir / 'dnslabeltext.cc'
 if not fs.is_file(libdnsdist_dnslabeltext_gen)
   ragel = find_program('ragel', required: true)
 
@@ -450,7 +459,7 @@ libdnsdist_common = declare_dependency(
     dependencies: [
       deps,
     ],
-  )
+  ),
 )
 
 libdnsdist_yaml_items = declare_dependency(
@@ -461,7 +470,7 @@ libdnsdist_yaml_items = declare_dependency(
       dep_boost,
       dep_dnsdist_rust_lib,
     ],
-  )
+  ),
 )
 
 tools = {
@@ -504,25 +513,26 @@ if get_option('fuzz-targets')
     fuzzer_ldflags += get_option('fuzzer_ldflags')
   endif
   tools += {
-    'fuzz-target-dnsdistcache' : {
+    'fuzz-target-dnsdistcache': {
       'main': src_dir / 'fuzz_dnsdistcache.cc',
       'link-args': fuzzer_ldflags,
-      'files-extra': fuzz_extra_sources
+      'files-extra': fuzz_extra_sources,
     },
   }
   if get_option('xsk').allowed() and dep_libbpf.found() and dep_libxdp.found()
     tools += {
-      'fuzz-target-xsk' : {
-         'main': src_dir / 'fuzz_xsk.cc',
-         'link-args': fuzzer_ldflags,
-         'files-extra': fuzz_extra_sources + [
-           src_dir / 'dnsname.cc',
-           src_dir / 'gettime.cc',
-           src_dir / 'iputils.cc',
-           src_dir / 'misc.cc',
-           src_dir / 'xsk.cc'
-           ]
-       },
+      'fuzz-target-xsk': {
+        'main': src_dir / 'fuzz_xsk.cc',
+        'link-args': fuzzer_ldflags,
+        'files-extra': fuzz_extra_sources
+        + [
+          src_dir / 'dnsname.cc',
+          src_dir / 'gettime.cc',
+          src_dir / 'iputils.cc',
+          src_dir / 'misc.cc',
+          src_dir / 'xsk.cc',
+        ],
+      },
     }
   endif
 endif
@@ -576,40 +586,40 @@ if get_option('unit-tests')
       test_sources,
       selectors_actions_sources,
       dependencies: [
-          dep_boost,
-          dep_boost_test,
-          dep_ipcrypt2,
-          dep_lua,
-          dep_protozero,
-          dep_yahttp,
+        dep_boost,
+        dep_boost_test,
+        dep_ipcrypt2,
+        dep_lua,
+        dep_protozero,
+        dep_yahttp,
       ],
-    )
+    ),
   )
   tools += {
     'testrunner': {
-        'main': [
-          src_dir / 'testrunner.cc',
-          mplexer_sources,
-        ],
-        'files-extra': [
-          # FFI files are directly added to the binary, because otherwise the visibility
-          # is ignored and the functions that are not used in the binary are not exported
-          src_dir / 'dnsdist-lua-ffi.cc',
-        ],
-        'deps-extra': [
-          libdnsdist_test,
-          dep_boost_test,
-          dep_ffi_interface,
-          dep_lua,
-          dep_protozero,
-          dep_yahttp,
-        ],
-    }
+      'main': [
+        src_dir / 'testrunner.cc',
+        mplexer_sources,
+      ],
+      'files-extra': [
+        # FFI files are directly added to the binary, because otherwise the visibility
+        # is ignored and the functions that are not used in the binary are not exported
+        src_dir / 'dnsdist-lua-ffi.cc',
+      ],
+      'deps-extra': [
+        libdnsdist_test,
+        dep_boost_test,
+        dep_ffi_interface,
+        dep_lua,
+        dep_protozero,
+        dep_yahttp,
+      ],
+    },
   }
 endif
 
 man_pages = []
-foreach tool, info: tools
+foreach tool, info : tools
   var_name = tool.underscorify()
   main = files(info['main'])
 
@@ -633,11 +643,11 @@ foreach tool, info: tools
         deps_extra,
       ],
       install: install,
-    )
+    ),
   )
 
   if 'manpages' in info
-    foreach man_page: info['manpages']
+    foreach man_page : info['manpages']
       man_pages += docs_dir / 'manpages' / (man_page + '.rst')
     endforeach
   endif
@@ -650,15 +660,20 @@ endif
 # Man-pages.
 python_venv = py.find_installation('python3', modules: 'venv', required: false)
 
-summary('Python with venv', python_venv.found(), bool_yn: true, section: 'Manual Pages')
+summary(
+  'Python with venv',
+  python_venv.found(),
+  bool_yn: true,
+  section: 'Manual Pages',
+)
 
 if get_option('man-pages') and python_venv.found()
   summary('Path', python_venv.full_path(), section: 'Manual Pages')
   summary('Version', python_venv.version(), section: 'Manual Pages')
   generated_man_pages = []
-  foreach tool, info: tools
+  foreach tool, info : tools
     if 'manpages' in info
-      foreach man_page: info['manpages']
+      foreach man_page : info['manpages']
         if not fs.is_file(man_page)
           generated_man_pages += man_page
         else
@@ -673,21 +688,22 @@ if get_option('man-pages') and python_venv.found()
   if generated_man_pages.length() != 0
     summary('Generating man pages', true, section: 'Manual Pages')
     custom_target(
-       'man-pages',
-       input: man_pages,
-       output: generated_man_pages,
-       install: true,
-       install_dir: join_paths(get_option('mandir'), 'man1'),
-       command: [
-         python_venv,
-         product_source_dir / docs_dir / 'generate-man-pages.py',
-         '--build-root', '@BUILD_ROOT@',
-         '--source-root', '@SOURCE_ROOT@',
-         '--venv-name', 'venv-dnsdist-man-pages',
-         '--requirements-file', docs_dir / 'requirements.txt',
-         '--source-directory', docs_dir,
-         '--target-directory', '@BUILD_ROOT@',
-       ] + man_pages,
+      'man-pages',
+      input: man_pages,
+      output: generated_man_pages,
+      install: true,
+      install_dir: join_paths(get_option('mandir'), 'man1'),
+      command: [
+        python_venv,
+        product_source_dir / docs_dir / 'generate-man-pages.py',
+        '--build-root', '@BUILD_ROOT@',
+        '--source-root', '@SOURCE_ROOT@',
+        '--venv-name', 'venv-dnsdist-man-pages',
+        '--requirements-file', docs_dir / 'requirements.txt',
+        '--source-directory', docs_dir,
+        '--target-directory', '@BUILD_ROOT@',
+      ]
+      + man_pages,
     )
   else
     summary('Generating man pages', false, section: 'Manual Pages')
@@ -711,7 +727,8 @@ if dep_systemd_prog.found()
   summary('Service Group', systemd_service_group, section: 'Systemd')
 
   systemd_service_conf.set(
-    'ProtectSystem', have_systemd_protect_system ? 'ProtectSystem=full' : '',
+    'ProtectSystem',
+    have_systemd_protect_system ? 'ProtectSystem=full' : '',
   )
   systemd_service_conf.set(
     'SystemCallArchitectures',
@@ -720,7 +737,8 @@ if dep_systemd_prog.found()
   systemd_system_call_filter = '~ @clock @debug @module @mount @raw-io @reboot @swap @cpu-emulation @obsolete'
   systemd_service_conf.set(
     'SystemCallFilter',
-    have_systemd_system_call_filter ? 'SystemCallFilter=' + systemd_system_call_filter : '',
+    have_systemd_system_call_filter ? 'SystemCallFilter='
+    + systemd_system_call_filter : '',
   )
   systemd_service_conf.set(
     'ProtectProc',
@@ -746,8 +764,8 @@ if dep_systemd_prog.found()
     'RemoveIPC': have_systemd_remove_ipc,
   }
 
-  foreach feature, enable_it: systemd_features
-    systemd_service_conf.set(feature, enable_it ? feature + '=true': '')
+  foreach feature, enable_it : systemd_features
+    systemd_service_conf.set(feature, enable_it ? feature + '=true' : '')
   endforeach
 
   # Disabled, it breaks LuaJIT.
@@ -791,22 +809,22 @@ endif
 
 install_data(
   'dnsdist.conf-dist',
-  install_dir : get_option('sysconfdir'),
-  follow_symlinks: true
+  install_dir: get_option('sysconfdir'),
+  follow_symlinks: true,
 )
 
 if python_venv.found()
   html_docs = custom_target(
     'html-docs',
     command: [
-        python_venv,
-        product_source_dir / docs_dir / 'generate-docs.py',
-        '--build-root', '@BUILD_ROOT@',
-        '--source-root', '@SOURCE_ROOT@',
-        '--venv-name', 'venv-docs',
-        '--requirements-file', docs_dir / 'requirements.txt',
-        '--source-directory', docs_dir,
-        '--target-directory', '@BUILD_ROOT@' / 'html-docs',
+      python_venv,
+      product_source_dir / docs_dir / 'generate-docs.py',
+      '--build-root', '@BUILD_ROOT@',
+      '--source-root', '@SOURCE_ROOT@',
+      '--venv-name', 'venv-docs',
+      '--requirements-file', docs_dir / 'requirements.txt',
+      '--source-directory', docs_dir,
+      '--target-directory', '@BUILD_ROOT@' / 'html-docs',
     ],
     output: 'sphinx.stamp',
     console: true,
@@ -821,15 +839,15 @@ if python_venv.found()
 
   pdf_docs = custom_target(
     command: [
-        python_venv,
-        product_source_dir / docs_dir / 'generate-docs.py',
-        '--build-root', '@BUILD_ROOT@',
-        '--source-root', '@SOURCE_ROOT@',
-        '--venv-name', 'venv-docs',
-        '--requirements-file', docs_dir / 'requirements.txt',
-        '--source-directory', docs_dir,
-        '--target-directory', '@BUILD_ROOT@',
-        '--pdf-name', 'dnsdist.pdf',
+      python_venv,
+      product_source_dir / docs_dir / 'generate-docs.py',
+      '--build-root', '@BUILD_ROOT@',
+      '--source-root', '@SOURCE_ROOT@',
+      '--venv-name', 'venv-docs',
+      '--requirements-file', docs_dir / 'requirements.txt',
+      '--source-directory', docs_dir,
+      '--target-directory', '@BUILD_ROOT@',
+      '--pdf-name', 'dnsdist.pdf',
     ],
     output: 'dnsdist.pdf',
     console: true,
