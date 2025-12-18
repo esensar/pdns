@@ -363,3 +363,37 @@ bool RedisKVStore::keyExists(const std::string& key)
 }
 
 #endif // HAVE_REDIS
+
+#ifdef HAVE_MMDB
+bool MMDBKVStore::keyExists(const std::string& key)
+{
+  return d_mmdb->exists(key);
+}
+
+bool MMDBKVStore::getValue(const std::string& key, std::string& value)
+{
+  if (d_field == "country") {
+    return d_mmdb->queryCountry(value, key);
+  }
+  else if (d_field == "continent") {
+    return d_mmdb->queryContinent(value, key);
+  }
+  else if (d_field == "asn") {
+    return d_mmdb->queryASN(value, key);
+  }
+  else if (d_field == "asnum") {
+    return d_mmdb->queryASnum(value, key);
+  }
+  else if (d_field == "city") {
+    return d_mmdb->queryCity(value, key, "en");
+  }
+  else {
+    return false;
+  }
+}
+
+bool MMDBKVStore::reload()
+{
+  return true;
+}
+#endif // HAVE_MMDB
