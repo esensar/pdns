@@ -52,7 +52,7 @@ std::unique_ptr<RedisReplyInterface<std::string>> RedisHGetCommand::operator()(c
   return std::make_unique<RedisStringReply>(client.executeCommand("HGET %b %b", hash_key.data(), hash_key.length(), key.data(), key.length()));
 }
 
-std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, std::string>>>> RedisHMGetCommand::operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const
+std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, std::optional<std::string>>>>> RedisHMGetCommand::operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const
 {
   auto begin = fields.begin();
   auto end = fields.end();

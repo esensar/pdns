@@ -242,7 +242,7 @@ public:
   }
 };
 
-class RedisArrayReply : public RedisReply<std::vector<std::pair<int, std::string>>>
+class RedisArrayReply : public RedisReply<std::vector<std::pair<int, std::optional<std::string>>>>
 {
 public:
   RedisArrayReply(redisReply* reply) :
@@ -253,11 +253,16 @@ public:
   {
     return d_reply && d_reply->type == REDIS_REPLY_ARRAY;
   }
-  std::vector<std::pair<int, std::string>> getValue() const override
+  std::vector<std::pair<int, std::optional<std::string>>> getValue() const override
   {
-    std::vector<std::pair<int, std::string>> result{d_reply->elements};
+    std::vector<std::pair<int, std::optional<std::string>>> result{d_reply->elements};
     for (size_t i = 0; i < d_reply->elements; i++) {
-      result.emplace_back(i, d_reply->element[i]->str);
+      if (d_reply->element[i]->type == REDIS_REPLY_NIL) {
+        result.emplace_back(i, std::nullopt);
+      }
+      else {
+        result.emplace_back(i, d_reply->element[i]->str);
+      }
     }
     return result;
   }
@@ -306,9 +311,9 @@ struct RedisHGetCommand : public RedisCommand<std::string, std::string, std::str
 };
 
 // This works with vector of pairs to better work with Lua interface
-struct RedisHMGetCommand : public RedisCommand<std::vector<std::pair<int, std::string>>, std::string, std::vector<std::pair<int, std::string>>>
+struct RedisHMGetCommand : public RedisCommand<std::vector<std::pair<int, std::optional<std::string>>>, std::string, std::vector<std::pair<int, std::string>>>
 {
-  std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, std::string>>>> operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const override;
+  std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, std::optional<std::string>>>>> operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const override;
 };
 
 struct RedisHGetAllCommand : public RedisCommand<std::unordered_map<std::string, std::string>, std::string>
