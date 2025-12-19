@@ -21,6 +21,7 @@
  */
 #pragma once
 
+#include "iputils.hh"
 #include <maxminddb.h>
 #include <string>
 
@@ -29,23 +30,23 @@ class MMDB
 public:
   MMDB(const std::string& fname, const std::string& modeStr);
 
-  bool queryCountry(std::string& ret, const std::string& ip);
-  bool queryContinent(std::string& ret, const std::string& ip);
-  bool queryASN(std::string& ret, const std::string& ip);
-  bool queryASnum(std::string& ret, const std::string& ip);
-  bool queryRegion(std::string& ret, const std::string& ip);
-  bool queryCity(std::string& ret, const std::string& ip, const std::string& language);
-  bool queryLocation(const std::string& ip, double& latitude, double& longitude, int& prec);
-  bool exists(const std::string& ip)
+  bool queryCountry(std::string& ret, const ComboAddress& ip);
+  bool queryContinent(std::string& ret, const ComboAddress& ip);
+  bool queryASN(std::string& ret, const ComboAddress& ip);
+  bool queryASnum(std::string& ret, const ComboAddress& ip);
+  bool queryRegion(std::string& ret, const ComboAddress& ip);
+  bool queryCity(std::string& ret, const ComboAddress& ip, const std::string& language);
+  bool queryLocation(const ComboAddress& ip, double& latitude, double& longitude, int& prec);
+  bool exists(const ComboAddress& ip)
   {
     MMDB_lookup_result_s res;
     return mmdbLookup(ip, res);
   }
 
-  ~MMDB() { MMDB_close(&d_s); };
+  ~MMDB() { MMDB_close(&d_db); };
 
 private:
-  MMDB_s d_s;
+  MMDB_s d_db;
 
-  bool mmdbLookup(const std::string& ip, MMDB_lookup_result_s& res);
+  bool mmdbLookup(const ComboAddress& ip, MMDB_lookup_result_s& res);
 };
