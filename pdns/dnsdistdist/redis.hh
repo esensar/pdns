@@ -258,10 +258,11 @@ public:
     std::vector<std::pair<int, std::optional<std::string>>> result{d_reply->elements};
     for (size_t i = 0; i < d_reply->elements; i++) {
       if (d_reply->element[i]->type == REDIS_REPLY_NIL) {
-        result.emplace_back(i, std::nullopt);
+        result.emplace_back(i + 1, std::nullopt);
       }
       else {
-        result.emplace_back(i, d_reply->element[i]->str);
+        // Lua arrays start at 1 instead of 0
+        result.emplace_back(i + 1, d_reply->element[i]->str);
       }
     }
     return result;
