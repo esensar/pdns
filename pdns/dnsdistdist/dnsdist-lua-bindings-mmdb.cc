@@ -66,6 +66,20 @@ void setupLuaBindingsMMDB(LuaContext& luaCtx)
     return result;
   });
 
+  luaCtx.registerFunction<std::optional<std::string> (std::shared_ptr<MMDB>::*)(const ComboAddress&)>("queryAS", [](std::shared_ptr<MMDB>& mmdb, const ComboAddress& ip) {
+    std::optional<std::string> result{std::nullopt};
+    if (!mmdb) {
+      return result;
+    }
+
+    std::string value;
+    if (mmdb->queryAS(value, ip)) {
+      result = value;
+    }
+
+    return result;
+  });
+
   luaCtx.registerFunction<std::optional<std::string> (std::shared_ptr<MMDB>::*)(const ComboAddress&)>("queryASN", [](std::shared_ptr<MMDB>& mmdb, const ComboAddress& ip) {
     std::optional<std::string> result{std::nullopt};
     if (!mmdb) {
@@ -74,20 +88,6 @@ void setupLuaBindingsMMDB(LuaContext& luaCtx)
 
     std::string value;
     if (mmdb->queryASN(value, ip)) {
-      result = value;
-    }
-
-    return result;
-  });
-
-  luaCtx.registerFunction<std::optional<std::string> (std::shared_ptr<MMDB>::*)(const ComboAddress&)>("queryASnum", [](std::shared_ptr<MMDB>& mmdb, const ComboAddress& ip) {
-    std::optional<std::string> result{std::nullopt};
-    if (!mmdb) {
-      return result;
-    }
-
-    std::string value;
-    if (mmdb->queryASnum(value, ip)) {
       result = value;
     }
 
