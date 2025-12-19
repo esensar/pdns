@@ -162,6 +162,7 @@ common_sources += files(
   src_dir / 'dnsdist-lua-bindings-kvs.cc',
   src_dir / 'dnsdist-lua-bindings-redis.cc',
   src_dir / 'dnsdist-lua-bindings-network.cc',
+  src_dir / 'dnsdist-lua-bindings-mmdb.cc',
   src_dir / 'dnsdist-lua-bindings-packetcache.cc',
   src_dir / 'dnsdist-lua-bindings-protobuf.cc',
   src_dir / 'dnsdist-lua-bindings-rings.cc',
