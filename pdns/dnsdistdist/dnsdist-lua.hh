@@ -51,6 +51,7 @@ void setupLuaBindingsDNSCrypt(LuaContext& luaCtx, bool client);
 void setupLuaBindingsDNSParser(LuaContext& luaCtx);
 void setupLuaBindingsDNSQuestion(LuaContext& luaCtx);
 void setupLuaBindingsCache(LuaContext& luaCtx);
+void setupLuaBindingsMMDB(LuaContext& luaCtx);
 void setupLuaBindingsKVS(LuaContext& luaCtx, bool client);
 void setupLuaBindingsRedis(LuaContext& luaCtx, bool client);
 void setupLuaBindingsLogging(LuaContext& luaCtx);

@@ -3196,6 +3196,7 @@ void setupLuaBindingsOnly(LuaContext& luaCtx, bool client, bool configCheck)
   setupLuaBindingsRedis(luaCtx, client);
   setupLuaBindingsLogging(luaCtx);
   setupLuaBindingsNetwork(luaCtx, client);
+  setupLuaBindingsMMDB(luaCtx);
   setupLuaBindingsPacketCache(luaCtx, client);
   setupLuaBindingsProtoBuf(luaCtx, client, configCheck);
   setupLuaBindingsRings(luaCtx, client);
