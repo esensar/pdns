@@ -367,25 +367,55 @@ bool RedisKVStore::keyExists(const std::string& key)
 #ifdef HAVE_MMDB
 bool MMDBKVStore::keyExists(const std::string& key)
 {
-  return d_mmdb->exists(key);
+  ComboAddress address;
+  if (key.size() == 4) {
+    struct sockaddr_in sin4;
+    memset(&sin4, 0, sizeof(sin4));
+    sin4.sin_family = AF_INET;
+    memcpy(&sin4.sin_addr.s_addr, key.c_str(), key.size());
+    address = ComboAddress(&sin4);
+  }
+  else if (key.size() == 16) {
+    struct sockaddr_in6 sin6;
+    memset(&sin6, 0, sizeof(sin6));
+    sin6.sin6_family = AF_INET6;
+    memcpy(&sin6.sin6_addr.s6_addr, key.c_str(), key.size());
+    address = ComboAddress(&sin6);
+  }
+  return d_mmdb->exists(address);
 }
 
 bool MMDBKVStore::getValue(const std::string& key, std::string& value)
 {
+  ComboAddress address;
+  if (key.size() == 4) {
+    struct sockaddr_in sin4;
+    memset(&sin4, 0, sizeof(sin4));
+    sin4.sin_family = AF_INET;
+    memcpy(&sin4.sin_addr.s_addr, key.c_str(), key.size());
+    address = ComboAddress(&sin4);
+  }
+  else if (key.size() == 16) {
+    struct sockaddr_in6 sin6;
+    memset(&sin6, 0, sizeof(sin6));
+    sin6.sin6_family = AF_INET6;
+    memcpy(&sin6.sin6_addr.s6_addr, key.c_str(), key.size());
+    address = ComboAddress(&sin6);
+  }
   if (d_field == "country") {
-    return d_mmdb->queryCountry(value, key);
+    return d_mmdb->queryCountry(value, address);
   }
   else if (d_field == "continent") {
-    return d_mmdb->queryContinent(value, key);
+    return d_mmdb->queryContinent(value, address);
   }
   else if (d_field == "asn") {
-    return d_mmdb->queryASN(value, key);
+    return d_mmdb->queryASN(value, address);
   }
   else if (d_field == "asnum") {
-    return d_mmdb->queryASnum(value, key);
+    return d_mmdb->queryASnum(value, address);
   }
   else if (d_field == "city") {
-    return d_mmdb->queryCity(value, key, "en");
+    return d_mmdb->queryCity(value, address, "en");
   }
   else {
     return false;

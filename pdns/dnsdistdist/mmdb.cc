@@ -26,6 +26,7 @@
 #endif
 
 #include "dolog.hh"
+#include "iputils.hh"
 #include "mmdb.hh"
 #include <maxminddb.h>
 
@@ -42,13 +43,13 @@ MMDB::MMDB(const std::string& fname, const std::string& modeStr)
 #endif
   else
     throw PDNSException(std::string("Unsupported mode ") + modeStr + ("for mmdb"));
-  memset(&d_s, 0, sizeof(d_s));
-  if ((ec = MMDB_open(fname.c_str(), flags, &d_s)) < 0)
+  memset(&d_db, 0, sizeof(d_db));
+  if ((ec = MMDB_open(fname.c_str(), flags, &d_db)) != MMDB_SUCCESS)
     throw PDNSException(std::string("Cannot open ") + fname + std::string(": ") + std::string(MMDB_strerror(ec)));
-  vinfolog("Opened MMDB database %s (type: %s version: %d.%d)", fname, d_s.metadata.database_type, d_s.metadata.binary_format_major_version, d_s.metadata.binary_format_minor_version);
+  vinfolog("Opened MMDB database %s (type: %s version: %d.%d)", fname, d_db.metadata.database_type, d_db.metadata.binary_format_major_version, d_db.metadata.binary_format_minor_version);
 }
 
-bool MMDB::queryCountry(string& ret, const string& ip)
+bool MMDB::queryCountry(string& ret, const ComboAddress& ip)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;
@@ -60,7 +61,7 @@ bool MMDB::queryCountry(string& ret, const string& ip)
   return true;
 }
 
-bool MMDB::queryContinent(string& ret, const string& ip)
+bool MMDB::queryContinent(string& ret, const ComboAddress& ip)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;
@@ -72,7 +73,7 @@ bool MMDB::queryContinent(string& ret, const string& ip)
   return true;
 }
 
-bool MMDB::queryASN(string& ret, const string& ip)
+bool MMDB::queryASN(string& ret, const ComboAddress& ip)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;
@@ -84,7 +85,7 @@ bool MMDB::queryASN(string& ret, const string& ip)
   return true;
 }
 
-bool MMDB::queryASnum(string& ret, const string& ip)
+bool MMDB::queryASnum(string& ret, const ComboAddress& ip)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;
@@ -96,7 +97,7 @@ bool MMDB::queryASnum(string& ret, const string& ip)
   return true;
 }
 
-bool MMDB::queryRegion(string& ret, const string& ip)
+bool MMDB::queryRegion(string& ret, const ComboAddress& ip)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;
@@ -108,7 +109,7 @@ bool MMDB::queryRegion(string& ret, const string& ip)
   return true;
 }
 
-bool MMDB::queryCity(string& ret, const string& ip, const string& language)
+bool MMDB::queryCity(string& ret, const ComboAddress& ip, const string& language)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;
@@ -120,7 +121,7 @@ bool MMDB::queryCity(string& ret, const string& ip, const string& language)
   return true;
 }
 
-bool MMDB::queryLocation(const string& ip,
+bool MMDB::queryLocation(const ComboAddress& ip,
                          double& latitude, double& longitude,
                          int& prec)
 {
@@ -140,16 +141,13 @@ bool MMDB::queryLocation(const string& ip,
   return true;
 }
 
-bool MMDB::mmdbLookup(const string& ip, MMDB_lookup_result_s& res)
+bool MMDB::mmdbLookup(const ComboAddress& ip, MMDB_lookup_result_s& res)
 {
-  int gai_ec = 0, mmdb_ec = 0;
-  res = MMDB_lookup_string(&d_s, ip.c_str(), &gai_ec, &mmdb_ec);
+  int mmdb_ec = 0;
+  res = MMDB_lookup_sockaddr(&d_db, reinterpret_cast<const struct sockaddr*>(&ip), &mmdb_ec);
 
-  if (gai_ec != 0) {
-    vinfolog("MMDB_lookup_string(%s) failed: %s", ip, gai_strerror(gai_ec));
-  }
-  else if (mmdb_ec != MMDB_SUCCESS) {
-    vinfolog("MMDB_lookup_string(%s) failed: %s", ip, MMDB_strerror(mmdb_ec));
+  if (mmdb_ec != MMDB_SUCCESS) {
+    vinfolog("MMDB_lookup_sockaddr(%s) failed: %s", ip.toString(), MMDB_strerror(mmdb_ec));
   }
   else if (res.found_entry) {
     // gl.netmask = res.netmask;
