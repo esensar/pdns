@@ -54,21 +54,15 @@ std::unique_ptr<RedisReplyInterface<std::string>> RedisHGetCommand::operator()(c
 
 std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, std::optional<std::string>>>>> RedisHMGetCommand::operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const
 {
-  auto begin = fields.begin();
-  auto end = fields.end();
 
-  std::string fieldsString;
-  if (begin != end) {
-    fieldsString.append(begin->second);
-    ++begin;
+  std::vector<std::string> command;
+  command.push_back("HMGET");
+  command.push_back(hash_key);
+  for (auto it = fields.begin(); it != fields.end(); ++it) {
+    command.push_back(it->second);
   }
 
-  for (; begin != end; ++begin) {
-    fieldsString.append(" ");
-    fieldsString.append(begin->second);
-  }
-
-  return std::make_unique<RedisArrayReply>(client.executeCommand("HMGET %b %b", hash_key.data(), hash_key.length(), fieldsString.data(), fieldsString.length()));
+  return std::make_unique<RedisArrayReply>(client.executeCommandArgv(command));
 }
 
 std::unique_ptr<RedisReplyInterface<std::unordered_map<std::string, std::string>>> RedisHGetAllCommand::operator()(const RedisClient& client, const std::string& hash_key) const
@@ -209,10 +203,31 @@ redisReply* RedisClient::executeCommand(const char* format, ...) const
   return result;
 };
 
+redisReply* RedisClient::executeCommandArgv(std::vector<std::string> args) const
+{
+  std::vector<const char*> argv;
+  std::vector<size_t> argvlen;
+  for (size_t i = 0; i < args.size(); ++i) {
+    argv.push_back(args[i].data());
+    argvlen.push_back(args[i].length());
+  }
+  return d_executor->executeCommandArgv(args.size(), argv.data(), argvlen.data());
+};
+
 redisReply* RedisClient::DirectExecutor::executeCommand(const char* format, va_list ap) const
 {
   auto connection = d_connection.getConnection();
   auto result = static_cast<redisReply*>(redisvCommand(connection->get(), format, ap));
+  if (connection->get()->err != 0) {
+    vinfolog("Redis connection error %s", connection->get()->errstr);
+  }
+  return result;
+}
+
+redisReply* RedisClient::DirectExecutor::executeCommandArgv(int argc, const char** argv, const size_t* argvlen) const
+{
+  auto connection = d_connection.getConnection();
+  auto result = static_cast<redisReply*>(redisCommandArgv(connection->get(), argc, argv, argvlen));
   if (connection->get()->err != 0) {
     vinfolog("Redis connection error %s", connection->get()->errstr);
   }
@@ -229,15 +244,34 @@ RedisClient::PipelineExecutor::PipelineExecutor(const std::string& url, uint32_t
   d_thread = std::thread(&RedisClient::PipelineExecutor::maintenanceThread, this);
 }
 
+redisReply* RedisClient::PipelineExecutor::executeCommandArgv(int argc, const char** argv, const size_t* argvlen) const
+{
+  char* command;
+  auto len = redisFormatCommandArgv(&command, argc, argv, argvlen);
+  if (len < 0) {
+    // TODO: handle formatting errors?
+    vinfolog("Redis command formatting error");
+    return nullptr;
+  }
+
+  return pipelineCommand(command, len);
+}
+
 redisReply* RedisClient::PipelineExecutor::executeCommand(const char* format, va_list ap) const
 {
   char* command;
   auto len = redisvFormatCommand(&command, format, ap);
   if (len < 0) {
     // TODO: handle formatting errors?
+    vinfolog("Redis command formatting error");
     return nullptr;
   }
 
+  return pipelineCommand(command, len);
+}
+
+redisReply* RedisClient::PipelineExecutor::pipelineCommand(const char* command, size_t len) const
+{
   std::mutex mtx;
   std::condition_variable cv;
   std::unique_lock<std::mutex> lock(mtx);
@@ -272,8 +306,18 @@ void RedisClient::PipelineExecutor::maintenanceThread()
       auto connection = d_connection.getConnection();
       std::list<PipelineCommand::callback_t> callbacks;
       while (auto command = d_pipelineReceiver.receive()) {
-        redisAppendFormattedCommand(connection->get(), command->get()->command, command->get()->length);
-        callbacks.push_back(command->get()->callback);
+        if (redisAppendFormattedCommand(connection->get(), command->get()->command, command->get()->length) == REDIS_OK) {
+          callbacks.push_back(command->get()->callback);
+        }
+        else {
+          if (connection->get()->err != 0) {
+            vinfolog("Redis connection error %s", connection->get()->errstr);
+          }
+          else {
+            vinfolog("Unknown redis connection error");
+          }
+          command->get()->callback(nullptr);
+        }
       }
 
       for (auto callback : callbacks) {
