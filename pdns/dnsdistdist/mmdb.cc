@@ -73,7 +73,7 @@ bool MMDB::queryContinent(string& ret, const ComboAddress& ip)
   return true;
 }
 
-bool MMDB::queryASN(string& ret, const ComboAddress& ip)
+bool MMDB::queryAS(string& ret, const ComboAddress& ip)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;
@@ -85,7 +85,7 @@ bool MMDB::queryASN(string& ret, const ComboAddress& ip)
   return true;
 }
 
-bool MMDB::queryASnum(string& ret, const ComboAddress& ip)
+bool MMDB::queryASN(string& ret, const ComboAddress& ip)
 {
   MMDB_entry_data_s data;
   MMDB_lookup_result_s res;

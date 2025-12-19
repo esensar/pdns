@@ -32,8 +32,8 @@ public:
 
   bool queryCountry(std::string& ret, const ComboAddress& ip);
   bool queryContinent(std::string& ret, const ComboAddress& ip);
+  bool queryAS(std::string& ret, const ComboAddress& ip);
   bool queryASN(std::string& ret, const ComboAddress& ip);
-  bool queryASnum(std::string& ret, const ComboAddress& ip);
   bool queryRegion(std::string& ret, const ComboAddress& ip);
   bool queryCity(std::string& ret, const ComboAddress& ip, const std::string& language);
   bool queryLocation(double& latitude, double& longitude, int& prec, const ComboAddress& ip);
