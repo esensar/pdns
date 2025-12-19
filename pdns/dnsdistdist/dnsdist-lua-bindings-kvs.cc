@@ -43,15 +43,6 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
   });
 #endif /* HAVE_CDB */
 
-#ifdef HAVE_MMDB
-  luaCtx.writeFunction("newMMDBKVStore", [client](const std::string& fname, const std::string& field, std::optional<bool> mmap) {
-    if (client) {
-      return std::shared_ptr<KeyValueStore>(nullptr);
-    }
-    return std::shared_ptr<KeyValueStore>(new MMDBKVStore(fname, mmap ? "mmap" : "", field));
-  });
-#endif /* HAVE_MMDB */
-
 #ifdef HAVE_REDIS
   luaCtx.writeFunction("newRedisKVStore", [client](const std::shared_ptr<RedisClient>& redisClient, std::optional<LuaAssociativeTable<boost::variant<std::string, bool, std::shared_ptr<GenericCacheInterface<std::string, std::string>>>>> vars) {
     if (client) {
