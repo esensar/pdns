@@ -86,6 +86,20 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return result;
   });
 
+  luaCtx.registerFunction<LuaArray<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&, const LuaArray<std::string>&)>("hmget", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key, const LuaArray<std::string>& fields) {
+    if (!rc) {
+      return LuaArray<std::string>();
+    }
+
+    auto reply = RedisHMGetCommand{}(*rc, hash_key, fields);
+
+    if (reply->ok()) {
+      return reply->getValue();
+    }
+
+    return LuaArray<std::string>();
+  });
+
   luaCtx.registerFunction<LuaAssociativeTable<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("hgetall", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key) {
     if (!rc) {
       return LuaAssociativeTable<std::string>();
