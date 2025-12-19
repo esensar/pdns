@@ -258,10 +258,11 @@ public:
     std::vector<std::pair<int, std::optional<std::string>>> result{d_reply->elements};
     for (size_t i = 0; i < d_reply->elements; i++) {
       if (d_reply->element[i]->type == REDIS_REPLY_NIL) {
-        result.emplace_back(i, std::nullopt);
+        result.emplace_back(i + 1, std::nullopt);
       }
       else {
-        result.emplace_back(i, d_reply->element[i]->str);
+        // Lua arrays start at 1 instead of 0
+        result.emplace_back(i + 1, d_reply->element[i]->str);
       }
     }
     return result;
@@ -453,6 +454,7 @@ public:
   }
 
   redisReply* executeCommand(const char* format, ...) const;
+  redisReply* executeCommandArgv(std::vector<std::string> args) const;
 
   const YaHTTP::URL& getUrl() const
   {
@@ -491,6 +493,7 @@ private:
   public:
     virtual ~Executor() = default;
     virtual redisReply* executeCommand(const char* format, va_list ap) const = 0;
+    virtual redisReply* executeCommandArgv(int argc, const char** argv, const size_t* argvlen) const = 0;
     virtual const YaHTTP::URL& getUrl() const = 0;
   };
 
@@ -502,6 +505,7 @@ private:
     {
     }
     redisReply* executeCommand(const char* format, va_list ap) const override;
+    redisReply* executeCommandArgv(int argc, const char** argv, const size_t* argvlen) const override;
 
     const YaHTTP::URL& getUrl() const override
     {
@@ -518,6 +522,7 @@ private:
     PipelineExecutor(const std::string& url, uint32_t pipelineInterval);
     ~PipelineExecutor();
     redisReply* executeCommand(const char* format, va_list ap) const override;
+    redisReply* executeCommandArgv(int argc, const char** argv, const size_t* argvlen) const override;
 
     const YaHTTP::URL& getUrl() const override
     {
@@ -526,12 +531,13 @@ private:
 
   private:
     void maintenanceThread();
+    redisReply* pipelineCommand(const char* command, size_t len) const;
 
     struct PipelineCommand
     {
       typedef std::function<void(redisReply*)> callback_t;
-      char* command;
-      int length;
+      const char* command;
+      size_t length;
       callback_t callback;
     };
     RedisConnection d_connection;
