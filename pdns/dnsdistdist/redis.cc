@@ -52,6 +52,25 @@ std::unique_ptr<RedisReplyInterface<std::string>> RedisHGetCommand::operator()(c
   return std::make_unique<RedisStringReply>(client.executeCommand("HGET %b %b", hash_key.data(), hash_key.length(), key.data(), key.length()));
 }
 
+std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, std::string>>>> RedisHMGetCommand::operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const
+{
+  auto begin = fields.begin();
+  auto end = fields.end();
+
+  std::string fieldsString;
+  if (begin != end) {
+    fieldsString.append(begin->second);
+    ++begin;
+  }
+
+  for (; begin != end; ++begin) {
+    fieldsString.append(" ");
+    fieldsString.append(begin->second);
+  }
+
+  return std::make_unique<RedisArrayReply>(client.executeCommand("HMGET %b %b", hash_key.data(), hash_key.length(), fieldsString.data(), fieldsString.length()));
+}
+
 std::unique_ptr<RedisReplyInterface<std::unordered_map<std::string, std::string>>> RedisHGetAllCommand::operator()(const RedisClient& client, const std::string& hash_key) const
 {
   return std::make_unique<RedisHashReply>(client.executeCommand("HGETALL %b", hash_key.data(), hash_key.length()));
