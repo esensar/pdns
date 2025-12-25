@@ -287,7 +287,7 @@ bool CDBKVStore::keyExists(const std::string& key)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std::optional<std::string> lookupAction, std::optional<std::string> dataName, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std::optional<std::string> lookupAction, std::optional<std::string> dataName, std::optional<std::vector<std::string>> rawArgs, std::optional<std::vector<std::string>> rawExistsArgs, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, std::string>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
   d_stats(stats)
 {
   std::unique_ptr<RedisLookupAction> command;
@@ -303,6 +303,12 @@ RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std:
     }
     else if (boost::iequals(lookupAction.value(), "sscan")) {
       command = std::make_unique<RedisSscanLookupAction>(dataName.value());
+    }
+    else if (boost::iequals(lookupAction.value(), "raw")) {
+      if (!rawArgs) {
+        throw std::runtime_error("Option 'rawArgs' is required for lookup action " + lookupAction.value());
+      }
+      command = std::make_unique<RedisRawLookupAction>(rawArgs.value(), rawExistsArgs);
     }
     else {
       throw std::runtime_error("Unknown lookup action: " + lookupAction.value());
