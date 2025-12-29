@@ -59,7 +59,6 @@ struct EDNSExtendedError
   };
   uint16_t infoCode;
   std::string extraText;
-  bool clearExisting = true;
 };
 
 bool getEDNSExtendedErrorOptFromString(const char* option, unsigned int len, EDNSExtendedError& eee);

@@ -25,6 +25,8 @@
 
 #include "config.h"
 #include "dnscrypt.hh"
+#include "dnsdist-configuration.hh"
+#include "dnsdist-edns.hh"
 #include "dnsname.hh"
 #include "dnsdist-protocols.hh"
 #include "ednsextendederror.hh"
@@ -150,7 +152,7 @@ struct InternalQueryState
   std::unique_ptr<QTag> qTag{nullptr}; // 8
   std::unique_ptr<PacketBuffer> d_packet{nullptr}; // Initial packet, so we can restart the query from the response path if needed // 8
   std::unique_ptr<ProtoBufData> d_protoBufData{nullptr};
-  std::unique_ptr<std::vector<EDNSExtendedError>> d_extendedErrors{nullptr};
+  std::unique_ptr<std::vector<dnsdist::edns::SetExtendedDNSErrorOperation>> d_extendedErrors{nullptr};
   boost::optional<uint32_t> tempFailureTTL{boost::none}; // 8
   ClientState* cs{nullptr}; // 8
   std::unique_ptr<DOHUnitInterface> du; // 8
