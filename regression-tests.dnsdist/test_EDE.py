@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-import extendederrors
 import dns
+import extendederrors
 from dnsdisttests import DNSDistTest, pickAvailablePort
+
 
 class TestBasics(DNSDistTest):
 
@@ -56,7 +57,8 @@ class TestBasics(DNSDistTest):
         EDE: Backend response
         """
         name = 'backend-response.ede.tests.powerdns.com.'
-        ede = extendederrors.ExtendedErrorOption(16, b'my extended error status')
+        ede = extendederrors.ExtendedErrorOption(
+            16, b'my extended error status')
         query = dns.message.make_query(name, 'A', 'IN', use_edns=True)
 
         backendResponse = dns.message.make_response(query)
@@ -95,8 +97,10 @@ class TestBasics(DNSDistTest):
         EDE: Backend response (DO)
         """
         name = 'backend-response-do.ede.tests.powerdns.com.'
-        ede = extendederrors.ExtendedErrorOption(16, b'my extended error status')
-        query = dns.message.make_query(name, 'A', 'IN', use_edns=True, want_dnssec=True)
+        ede = extendederrors.ExtendedErrorOption(
+            16, b'my extended error status')
+        query = dns.message.make_query(
+            name, 'A', 'IN', use_edns=True, want_dnssec=True)
 
         backendResponse = dns.message.make_response(query)
         backendResponse.use_edns(edns=True, payload=4096, options=[])
@@ -136,7 +140,8 @@ class TestBasics(DNSDistTest):
         EDE: Backend response with existing EDE
         """
         name = 'backend-response-existing-ede.ede.tests.powerdns.com.'
-        ede = extendederrors.ExtendedErrorOption(16, b'my extended error status')
+        ede = extendederrors.ExtendedErrorOption(
+            16, b'my extended error status')
         query = dns.message.make_query(name, 'A', 'IN', use_edns=True)
 
         backendResponse = dns.message.make_response(query)
@@ -176,7 +181,8 @@ class TestBasics(DNSDistTest):
         EDE: Self-answered
         """
         name = 'self-answered.ede.tests.powerdns.com.'
-        ede = extendederrors.ExtendedErrorOption(42, b'my self-answered extended error status')
+        ede = extendederrors.ExtendedErrorOption(
+            42, b'my self-answered extended error status')
         query = dns.message.make_query(name, 'A', 'IN', use_edns=True)
         # dnsdist sets RA = RD for self-generated responses
         query.flags &= ~dns.flags.RD
