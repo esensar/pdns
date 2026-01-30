@@ -439,6 +439,16 @@ static bool handleTLSConfiguration(const Context& context, const dnsdist::rust::
   return true;
 }
 
+static std::vector<std::string> convertVecString(const ::rust::Vec<::rust::String>& stringVec)
+{
+  std::vector<std::string> strings;
+  strings.reserve(stringVec.size());
+  for (const auto& str : stringVec) {
+    strings.emplace_back(str);
+  }
+  return strings;
+}
+
 static std::shared_ptr<DownstreamState> createBackendFromConfiguration(const Context& context, const dnsdist::rust::settings::BackendConfiguration& config, bool configCheck)
 {
   DownstreamState::Config backendConfig;
