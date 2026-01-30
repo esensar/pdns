@@ -743,9 +743,11 @@ def ci_dnsdist_configure_autotools(features, additional_flags, additional_ld_fla
                       --with-libsodium \
                       --with-lua=luajit \
                       --with-libcap \
+                      --with-mmdb \
                       --with-net-snmp \
                       --with-nghttp2 \
-                      --with-re2'
+                      --with-re2 \
+                      --with-redis'
     else:
       features_set = '--disable-dnstap \
                       --disable-dnscrypt \
@@ -758,9 +760,11 @@ def ci_dnsdist_configure_autotools(features, additional_flags, additional_ld_fla
                       --without-libedit \
                       --without-libsodium \
                       --without-lmdb \
+                      --without-mmdb \
                       --without-net-snmp \
                       --without-nghttp2 \
-                      --without-re2'
+                      --without-re2 \
+                      --without-redis'
     unittests = get_unit_tests()
     fuzztargets = get_fuzzing_targets()
     tools = f'''AR=llvm-ar-{clang_version} RANLIB=llvm-ranlib-{clang_version}''' if is_compiler_clang() else ''
@@ -785,6 +789,7 @@ def ci_dnsdist_configure_meson(features, additional_flags, additional_ld_flags, 
                       -D libedit=enabled \
                       -D libsodium=enabled \
                       -D lmdb=enabled \
+                      -D mmdb=enabled \
                       -D nghttp2=enabled \
                       -D re2=enabled \
                       -D systemd-service=enabled \
@@ -793,6 +798,7 @@ def ci_dnsdist_configure_meson(features, additional_flags, additional_ld_flags, 
                       -D dns-over-http3=enabled \
                       -D dns-over-quic=enabled \
                       -D dns-over-tls=enabled \
+                      -D redis=enabled \
                       -D reproducible=true \
                       -D snmp=enabled \
                       -D yaml=enabled'
@@ -806,6 +812,7 @@ def ci_dnsdist_configure_meson(features, additional_flags, additional_ld_flags, 
                       -D libedit=disabled \
                       -D libsodium=disabled \
                       -D lmdb=disabled \
+                      -D mmdb=disabled \
                       -D nghttp2=disabled \
                       -D re2=disabled \
                       -D systemd-service=disabled \
@@ -814,6 +821,7 @@ def ci_dnsdist_configure_meson(features, additional_flags, additional_ld_flags, 
                       -D dns-over-http3=disabled \
                       -D dns-over-quic=disabled \
                       -D dns-over-tls=disabled \
+                      -D redis=disabled \
                       -D reproducible=false \
                       -D snmp=disabled \
                       -D yaml=disabled'
