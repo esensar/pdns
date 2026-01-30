@@ -29,7 +29,7 @@
 void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] bool client)
 {
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, std::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
+  luaCtx.writeFunction("newRedisClient", [client](const std::string& url, boost::optional<LuaAssociativeTable<boost::variant<bool, std::string>>> vars) {
     if (client) {
       return std::shared_ptr<RedisClient>(nullptr);
     }
@@ -102,9 +102,9 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return result;
   });
 
-  luaCtx.registerFunction<LuaArray<std::optional<std::string>> (std::shared_ptr<RedisClient>::*)(const std::string&, const LuaArray<std::string>&)>("hmget", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key, const LuaArray<std::string>& fields) {
+  luaCtx.registerFunction<LuaArray<boost::optional<std::string>> (std::shared_ptr<RedisClient>::*)(const std::string&, const LuaArray<std::string>&)>("hmget", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key, const LuaArray<std::string>& fields) {
     if (!rc) {
-      return LuaArray<std::optional<std::string>>();
+      return LuaArray<boost::optional<std::string>>();
     }
 
     auto reply = RedisHMGetCommand{}(*rc, hash_key, fields);
@@ -113,7 +113,7 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
       return reply->getValue();
     }
 
-    return LuaArray<std::optional<std::string>>();
+    return LuaArray<boost::optional<std::string>>();
   });
 
   luaCtx.registerFunction<LuaAssociativeTable<LuaAny> (std::shared_ptr<RedisClient>::*)(const std::string&)>("hgetall", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key) {

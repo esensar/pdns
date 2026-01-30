@@ -112,7 +112,7 @@ std::vector<std::string> KeyValueLookupKeySuffix::getKeys(const DNSName& qname)
   std::vector<std::string> result;
   result.reserve(labelsCount);
 
-  while(!lowerQName.isRoot()) {
+  while (!lowerQName.isRoot()) {
     result.emplace_back(d_wireFormat ? lowerQName.toDNSString() : lowerQName.toStringRootDot());
     labelsCount--;
     if (!lowerQName.chopOff() || labelsCount == 0) {
@@ -216,7 +216,8 @@ bool LMDBKVStore::getRangeValue(const std::string& key, std::string& value)
 
 #ifdef HAVE_CDB
 
-CDBKVStore::CDBKVStore(const std::string& fname, time_t refreshDelay): d_fname(fname), d_refreshDelay(refreshDelay)
+CDBKVStore::CDBKVStore(const std::string& fname, time_t refreshDelay) :
+  d_fname(fname), d_refreshDelay(refreshDelay)
 {
   d_refreshing.clear();
 
@@ -228,7 +229,8 @@ CDBKVStore::CDBKVStore(const std::string& fname, time_t refreshDelay): d_fname(f
   refreshDBIfNeeded(now);
 }
 
-CDBKVStore::~CDBKVStore() {
+CDBKVStore::~CDBKVStore()
+{
 }
 
 bool CDBKVStore::reload(const struct stat& st)
@@ -354,7 +356,7 @@ bool MMDBKVStore::getValue(const std::string& key, std::string& value)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std::optional<std::string> lookupAction, std::optional<std::string> dataName, std::optional<std::vector<std::string>> rawArgs, std::optional<std::vector<std::string>> rawExistsArgs, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, LuaAny>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, boost::optional<std::string> lookupAction, boost::optional<std::string> dataName, boost::optional<std::vector<std::string>> rawArgs, boost::optional<std::vector<std::string>> rawExistsArgs, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, LuaAny>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
   d_stats(stats)
 {
   std::unique_ptr<RedisLookupAction> command;

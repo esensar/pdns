@@ -23,7 +23,6 @@ SUBDIRS=dnsdist-rust-lib \
 	dnsdist-rust-lib/rust \
 	ext/arc4random \
 	ext/ipcrypt \
-	ext/ipcrypt2 \
 	ext/probds \
 	ext/yahttp
 

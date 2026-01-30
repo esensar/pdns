@@ -54,7 +54,7 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
 #endif // HAVE_MMDB
 
 #ifdef HAVE_REDIS
-  luaCtx.writeFunction("newRedisKVStore", [client](const std::shared_ptr<RedisClient>& redisClient, std::optional<LuaAssociativeTable<boost::variant<std::string, bool, std::shared_ptr<GenericCacheInterface<std::string, LuaAny>>, LuaArray<std::string>>>> vars) {
+  luaCtx.writeFunction("newRedisKVStore", [client](const std::shared_ptr<RedisClient>& redisClient, boost::optional<LuaAssociativeTable<boost::variant<std::string, bool, std::shared_ptr<GenericCacheInterface<std::string, LuaAny>>, LuaArray<std::string>>>> vars) {
     if (client) {
       return std::shared_ptr<KeyValueStore>(nullptr);
     }
@@ -64,10 +64,10 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     std::shared_ptr<GenericCacheInterface<std::string, LuaAny>> copyCacheFilter;
     bool copyCacheEnabled{false};
     unsigned int copyCacheTtl{0};
-    std::optional<std::string> lookupAction;
-    std::optional<std::string> dataName;
-    std::optional<LuaArray<std::string>> rawArgsInput;
-    std::optional<LuaArray<std::string>> rawExistsArgsInput;
+    boost::optional<std::string> lookupAction;
+    boost::optional<std::string> dataName;
+    boost::optional<LuaArray<std::string>> rawArgsInput;
+    boost::optional<LuaArray<std::string>> rawExistsArgsInput;
     getOptionalValue<std::shared_ptr<GenericCacheInterface<std::string, LuaAny>>>(vars, "resultCache", resultCache);
     getOptionalValue<std::shared_ptr<GenericCacheInterface<std::string, LuaAny>>>(vars, "negativeCache", negativeCache);
     getOptionalValue<bool>(vars, "copyCacheEnabled", copyCacheEnabled);
@@ -80,8 +80,8 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
 
     checkAllParametersConsumed("newRedisKVStore", vars);
 
-    std::optional<std::vector<std::string>> rawArgs;
-    std::optional<std::vector<std::string>> rawExistsArgs;
+    boost::optional<std::vector<std::string>> rawArgs;
+    boost::optional<std::vector<std::string>> rawExistsArgs;
 
     if (rawArgsInput) {
       auto rawInput = rawArgsInput.value();
@@ -131,7 +131,7 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     return std::shared_ptr<KeyValueLookupKey>(new KeyValueLookupKeyTag(tag));
   });
 
-  luaCtx.registerFunction<std::string(std::shared_ptr<KeyValueStore>::*)(const boost::variant<ComboAddress, DNSName, std::string>, boost::optional<bool> wireFormat)>("lookup", [](std::shared_ptr<KeyValueStore>& kvs, const boost::variant<ComboAddress, DNSName, std::string> keyVar, boost::optional<bool> wireFormat) {
+  luaCtx.registerFunction<std::string (std::shared_ptr<KeyValueStore>::*)(const boost::variant<ComboAddress, DNSName, std::string>, boost::optional<bool> wireFormat)>("lookup", [](std::shared_ptr<KeyValueStore>& kvs, const boost::variant<ComboAddress, DNSName, std::string> keyVar, boost::optional<bool> wireFormat) {
     std::string result;
     if (!kvs) {
       return result;
@@ -163,7 +163,7 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     return result;
   });
 
-  luaCtx.registerFunction<std::string(std::shared_ptr<KeyValueStore>::*)(const DNSName&, boost::optional<size_t> minLabels, boost::optional<bool> wireFormat)>("lookupSuffix", [](std::shared_ptr<KeyValueStore>& kvs, const DNSName& dn, boost::optional<size_t> minLabels, boost::optional<bool> wireFormat) {
+  luaCtx.registerFunction<std::string (std::shared_ptr<KeyValueStore>::*)(const DNSName&, boost::optional<size_t> minLabels, boost::optional<bool> wireFormat)>("lookupSuffix", [](std::shared_ptr<KeyValueStore>& kvs, const DNSName& dn, boost::optional<size_t> minLabels, boost::optional<bool> wireFormat) {
     std::string result;
     if (!kvs) {
       return result;
@@ -179,7 +179,7 @@ void setupLuaBindingsKVS([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]] b
     return result;
   });
 
-  luaCtx.registerFunction<bool(std::shared_ptr<KeyValueStore>::*)()>("reload", [](std::shared_ptr<KeyValueStore>& kvs) {
+  luaCtx.registerFunction<bool (std::shared_ptr<KeyValueStore>::*)()>("reload", [](std::shared_ptr<KeyValueStore>& kvs) {
     if (!kvs) {
       return false;
     }

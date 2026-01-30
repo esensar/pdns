@@ -30,7 +30,7 @@
 void setupLuaBindingsMMDB([[maybe_unused]] LuaContext& luaCtx)
 {
 #ifdef HAVE_MMDB
-  luaCtx.writeFunction("openMMDB", [](const std::string& name, std::optional<LuaAssociativeTable<boost::variant<bool>>> vars) {
+  luaCtx.writeFunction("openMMDB", [](const std::string& name, boost::optional<LuaAssociativeTable<boost::variant<bool>>> vars) {
     bool mmap{false};
     getOptionalValue<bool>(vars, "mmap", mmap);
 
@@ -39,8 +39,8 @@ void setupLuaBindingsMMDB([[maybe_unused]] LuaContext& luaCtx)
     return mmdb;
   });
 
-  luaCtx.registerFunction<std::optional<LuaAny> (std::shared_ptr<MMDB>::*)(const LuaTypeOrArrayOf<std::string>&, const ComboAddress&)>("query", [](std::shared_ptr<MMDB>& mmdb, const LuaTypeOrArrayOf<std::string>& queryParams, const ComboAddress& ip) {
-    std::optional<LuaAny> result{std::nullopt};
+  luaCtx.registerFunction<boost::optional<LuaAny> (std::shared_ptr<MMDB>::*)(const LuaTypeOrArrayOf<std::string>&, const ComboAddress&)>("query", [](std::shared_ptr<MMDB>& mmdb, const LuaTypeOrArrayOf<std::string>& queryParams, const ComboAddress& ip) {
+    boost::optional<LuaAny> result{boost::none};
     if (!mmdb) {
       return result;
     }

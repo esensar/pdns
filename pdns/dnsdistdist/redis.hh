@@ -259,7 +259,7 @@ public:
   }
 };
 
-class RedisArrayReply : public RedisReply<std::vector<std::pair<int, std::optional<std::string>>>>
+class RedisArrayReply : public RedisReply<std::vector<std::pair<int, boost::optional<std::string>>>>
 {
 public:
   RedisArrayReply(redisReply* reply) :
@@ -270,13 +270,13 @@ public:
   {
     return d_reply && d_reply->type == REDIS_REPLY_ARRAY;
   }
-  std::vector<std::pair<int, std::optional<std::string>>> getValue() const override
+  std::vector<std::pair<int, boost::optional<std::string>>> getValue() const override
   {
-    std::vector<std::pair<int, std::optional<std::string>>> result;
+    std::vector<std::pair<int, boost::optional<std::string>>> result;
     result.reserve(d_reply->elements);
     for (size_t i = 0; i < d_reply->elements; i++) {
       if (d_reply->element[i]->type == REDIS_REPLY_NIL) {
-        result.emplace_back(i + 1, std::nullopt);
+        result.emplace_back(i + 1, boost::none);
       }
       else {
         // Lua arrays start at 1 instead of 0
@@ -319,18 +319,18 @@ public:
   {
     return parseReply(d_reply).value();
   }
-  std::optional<LuaAny> getValueOpt() const
+  boost::optional<LuaAny> getValueOpt() const
   {
     return parseReply(d_reply);
   }
 
 private:
-  std::optional<LuaAny> parseReply(redisReply* reply) const
+  boost::optional<LuaAny> parseReply(redisReply* reply) const
   {
     switch (reply->type) {
     case REDIS_REPLY_INTEGER:
       // TODO: narrowing conversion
-      return (int)reply->integer;
+      return (LuaAny)(int)reply->integer;
       break;
     case REDIS_REPLY_STRING:
     case REDIS_REPLY_STATUS:
@@ -338,27 +338,27 @@ private:
     case REDIS_REPLY_BIGNUM:
     case REDIS_REPLY_VERB:
 #endif
-      return std::string(reply->str, reply->len);
+      return (LuaAny)std::string(reply->str, reply->len);
       break;
     case REDIS_REPLY_ARRAY:
 #if HIREDIS_MAJOR > 0
     case REDIS_REPLY_SET:
 #endif
-      return parseArray(reply);
+      return (LuaAny)parseArray(reply);
       break;
 #if HIREDIS_MAJOR > 0
     case REDIS_REPLY_DOUBLE:
-      return reply->dval;
+      return (LuaAny)reply->dval;
       break;
     case REDIS_REPLY_BOOL:
-      return reply->integer > 0;
+      return (LuaAny)(bool)(reply->integer > 0);
       break;
     case REDIS_REPLY_MAP:
-      return parseMap(reply);
+      return (LuaAny)parseMap(reply);
       break;
 #endif
     }
-    return std::nullopt;
+    return boost::none;
   }
 
   LuaArray<LuaAny> parseArray(redisReply* data) const
@@ -478,9 +478,9 @@ struct RedisHGetCommand : public RedisCommand<std::string, std::string, std::str
 };
 
 // This works with vector of pairs to better work with Lua interface
-struct RedisHMGetCommand : public RedisCommand<std::vector<std::pair<int, std::optional<std::string>>>, std::string, std::vector<std::pair<int, std::string>>>
+struct RedisHMGetCommand : public RedisCommand<std::vector<std::pair<int, boost::optional<std::string>>>, std::string, std::vector<std::pair<int, std::string>>>
 {
-  std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, std::optional<std::string>>>>> operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const override;
+  std::unique_ptr<RedisReplyInterface<std::vector<std::pair<int, boost::optional<std::string>>>>> operator()(const RedisClient& client, const std::string& hash_key, const std::vector<std::pair<int, std::string>>& fields) const override;
 };
 
 struct RedisHGetAllCommand : public RedisCommand<std::unordered_map<std::string, LuaAny>, std::string>
@@ -614,7 +614,7 @@ private:
 class RedisRawLookupAction : public RedisLookupAction
 {
 public:
-  RedisRawLookupAction(const std::vector<std::string>& args, const std::optional<std::vector<std::string>>& existsArgs = std::nullopt) :
+  RedisRawLookupAction(const std::vector<std::string>& args, const boost::optional<std::vector<std::string>>& existsArgs = boost::none) :
     RedisLookupAction("RAW" + std::accumulate(args.begin(), args.end(), std::string(), [](const std::string& acc, const std::string& arg) { return acc + (acc.empty() ? std::string() : ",") + arg; })), d_args(args), d_existsArgs(existsArgs.value_or(d_args)), d_keyArgPos(find_if(args.begin(), args.end(), [](const std::string& arg) { return arg.find("{}") != std::string::npos; }) - args.begin()), d_keyArgPosInString(d_keyArgPos < d_args.size() ? args[d_keyArgPos].find("{}") : 0), d_keyArgPosInExists(existsArgs ? find_if(existsArgs.value().begin(), existsArgs.value().end(), [](const std::string& arg) { return arg.find("{}") != std::string::npos; }) - existsArgs.value().begin() : d_keyArgPos), d_keyArgPosInExistsInString(d_keyArgPosInExists < d_existsArgs.size() ? d_existsArgs[d_keyArgPosInExists].find("{}") : 0)
   {
   }

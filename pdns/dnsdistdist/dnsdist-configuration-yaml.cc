@@ -1838,7 +1838,7 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
       if (redis.negative_cache_enabled) {
         negativeCache = std::make_shared<GenericCache<std::string, LuaAny>>(GenericCache<std::string, LuaAny>::CacheSettings{.d_ttlEnabled = false, .d_ttl = 0, .d_lruEnabled = false});
       }
-      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, std::optional<std::string>(redis.lookup_action), std::optional<std::string>(redis.data_name), std::optional<std::vector<std::string>>(dnsdist::configuration::yaml::convertVecString(redis.raw_args)), std::optional<std::vector<std::string>>(dnsdist::configuration::yaml::convertVecString(redis.raw_exists_args)), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache, copyCacheFilter, std::make_shared<RedisStats>()));
+      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, boost::optional<std::string>(redis.lookup_action), boost::optional<std::string>(redis.data_name), boost::optional<std::vector<std::string>>(dnsdist::configuration::yaml::convertVecString(redis.raw_args)), boost::optional<std::vector<std::string>>(dnsdist::configuration::yaml::convertVecString(redis.raw_exists_args)), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache, copyCacheFilter, std::make_shared<RedisStats>()));
       dnsdist::configuration::yaml::registerType<KeyValueStore>(store, redis.name);
     }
     else {

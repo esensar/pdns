@@ -26,6 +26,7 @@
 #include "dnsdist.hh"
 #include "dnsdist-protobuf.hh"
 #include "protozero.hh"
+#include "dolog.hh"
 
 DNSDistProtoBufMessage::DNSDistProtoBufMessage(const DNSQuestion& dnsquestion) :
   d_dq(dnsquestion)
