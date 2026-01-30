@@ -173,7 +173,7 @@ carbon:
     - name: "name"
       type: "String"
       default: ""
-      description: "An optional string specifying the hostname that should be used. If left empty, the system hostname is used"
+      description: "An optional string specifying the hostname that should be used. If left empty, the general.server_id is used"
     - name: "interval"
       type: u32
       default: 30
@@ -464,6 +464,9 @@ key_value_stores:
       description: "List of lookup keys"
 
 webserver:
+  changes:
+    - version: 2.1.0
+      content: "Added the ``prometheus_add_instance`` option"
   parameters:
     - name: "listen_addresses"
       type: "Vec<String>"
@@ -489,6 +492,10 @@ webserver:
       type: "bool"
       default: "true"
       description: "Whether access to the statistics (/metrics and /jsonstat endpoints) requires a valid password or API key"
+    - name: "prometheus_add_instance"
+      type: "bool"
+      default: "false"
+      description: "Add the 'instance' label with the value of general.server_id to all prometheus metrics"
     - name: "dashboard_requires_authentication"
       type: "bool"
       default: "true"
@@ -801,6 +808,13 @@ ring_buffers:
       lua-name: "setRingBuffersOptions"
       internal-field-name: "d_ringsRecordResponses"
       runtime-configurable: false
+    - name: "sampling_rate"
+      type: "u64"
+      default: 0
+      description: "Set a sampling rate ``S`` so that only 1 out of ``S`` queries and responses are inserted into the rings, to keep a longer history without consuming too much memory while also being able to process it quickly. Default is 0 which means there is no sampling and all entries are inserted."
+      lua-name: "setRingBuffersOptions"
+      internal-field-name: "d_ringsSamplingRate"
+      runtime-configurable: false
 
 incoming_tls_certificate_key_pair:
   description: "A pair of TLS certificate and key, with an optional associated password"
@@ -976,8 +990,8 @@ http_custom_response_header:
 
 http_responses_map:
   description: |
-               An entry of an HTTP response map. Every query that matches the regular expression supplied in ``expression`` will be immediately answered with a HTTP response.
-               The status of the HTTP response will be the one supplied by ``status``, and the content set to the one supplied by ``content``, except if the status is a redirection (3xx) in which case the content is expected to be the URL to redirect to.
+    An entry of an HTTP response map. Every query that matches the regular expression supplied in ``expression`` will be immediately answered with a HTTP response.
+    The status of the HTTP response will be the one supplied by ``status``, and the content set to the one supplied by ``content``, except if the status is a redirection (3xx) in which case the content is expected to be the URL to redirect to.
   parameters:
     - name: "expression"
       type: "String"
@@ -1002,7 +1016,6 @@ incoming_doh:
       descripton: "Which underlying HTTP2 library should be used"
       supported-values:
         - "nghttp2"
-        - "h2o"
     - name: "paths"
       type: "Vec<String>"
       default: "/dns-query"
@@ -1014,7 +1027,7 @@ incoming_doh:
     - name: "server_tokens"
       type: "String"
       default: ""
-      description: "The content of the Server: HTTP header returned by dnsdist. The default is ``h2o/dnsdist`` when ``h2o`` is used, ``nghttp2-<version>/dnsdist`` when ``nghttp2`` is"
+      description: "The content of the Server: HTTP header returned by dnsdist. The default is ``nghttp2-<version>/dnsdist`` when ``nghttp2`` is used"
     - name: "send_cache_control_headers"
       type: "bool"
       default: "true"
@@ -1422,7 +1435,7 @@ backend:
     - name: "pools"
       type: "Vec<String>"
       default: ""
-      description: "List of pools to place this backend into. By default a server is placed in the default (\"\") pool"
+      description: 'List of pools to place this backend into. By default a server is placed in the default ("") pool'
     - name: "tcp"
       type: "OutgoingTcpConfiguration"
       default: true
@@ -1439,12 +1452,12 @@ backend:
       type: "String"
       default: ""
       description: |
-                   The source address or interface to use for queries to this backend, by default this is left to the kernel's address selection.
-                     The following formats are supported:
+        The source address or interface to use for queries to this backend, by default this is left to the kernel's address selection.
+          The following formats are supported:
 
-                     - address, e.g. ``""192.0.2.2""``
-                     - interface name, e.g. ``""eth0""``
-                     - address@interface, e.g. ``""192.0.2.2@eth0""``
+          - address, e.g. ``""192.0.2.2""``
+          - interface name, e.g. ``""eth0""``
+          - address@interface, e.g. ``""192.0.2.2@eth0""``
 
     - name: "sockets"
       type: "u32"
@@ -1821,25 +1834,23 @@ security_polling:
       runtime-configurable: true
 
 structured_logging:
-  description: "Structured-like logging settings"
+  description: "Structured logging settings"
   parameters:
     - name: "enabled"
       type: "bool"
-      default: "false"
+      default: "true"
       description: |
-                   Set whether log messages should be in a structured-logging-like format. This is turned off by default.
-                     The resulting format looks like this (when timestamps are enabled via ``--log-timestamps`` and with ``level_prefix: prio`` and ``time_format: ISO8601``)::
-
-                         ts=\"2023-11-06T12:04:58+0100\" prio=\"Info\" msg=\"Added downstream server 127.0.0.1:53\"
-
-                     And with ``level_prefix: level`` and ``time_format: numeric``)::
-
-                         ts=\"1699268815.133\" level=\"Info\" msg=\"Added downstream server 127.0.0.1:53\"
-
+        Set whether log messages should be in structured-logging format."
+      changes:
+        - version: "2.1.0"
+          content: "This setting is now enabled by default"
     - name: "level_prefix"
       type: "String"
       default: "prio"
       description: "Set the key name for the log level. There is unfortunately no standard name for this key, so in some setups it might be useful to set this value to a different name to have consistency across products"
+      changes:
+        - version: "2.1.0"
+          content: "This setting has no longer any effect because it was confusing. The log level is now always logged as ``level`` and the syslog priority, if any, as ``priority`` in all backends except the default one where it is named ``prio``"
     - name: "time_format"
       type: "String"
       default: "numeric"
@@ -1847,6 +1858,22 @@ structured_logging:
       supported-values:
         - "ISO8601"
         - "numeric"
+    - name: "backend"
+      type: "String"
+      default: ""
+      version_added: "2.1.0"
+      description: |
+        The backend used for structured logging output. See :doc:`../advanced/structured-logging-dictionary` for more details. Available backends are:
+
+        * ``default``: use the traditional logging system to output structured logging information.
+        * ``systemd-journal``: use ``systemd-journal``. When using this backend, provide ``-o verbose`` or simular output option to ``journalctl`` to view the full information.
+        * ``json``: JSON objects are written to the standard error stream.
+    - name: "set_instance_from_server_id"
+      type: "bool"
+      default: "false"
+      description: |
+        Add a field "instance" to each log line with the value of ``general.server_id``.
+      version_added: 2.1.0
 
 logging:
   description: "Logging settings"
@@ -1875,7 +1902,49 @@ logging:
       default: ""
       lua-name: "setSyslogFacility"
       description: "Set the syslog logging facility to the supplied value (values with or without the ``log_`` prefix are supported)"
-      supported-values: [local0, log_local0, local1, log_local1, local2, log_local2, local3, log_local3, local4, log_local4, local5, log_local5, local6, log_local6, local7, log_local7, kern, log_kern, user, log_user, mail, log_mail, daemon, log_daemon, auth, log_auth, syslog, log_syslog, lpr, log_lpr, news, log_news, uucp, log_uucp, cron, log_cron, authpriv, log_authpriv, ftp, log_ftp]
+      supported-values:
+        [
+          local0,
+          log_local0,
+          local1,
+          log_local1,
+          local2,
+          log_local2,
+          local3,
+          log_local3,
+          local4,
+          log_local4,
+          local5,
+          log_local5,
+          local6,
+          log_local6,
+          local7,
+          log_local7,
+          kern,
+          log_kern,
+          user,
+          log_user,
+          mail,
+          log_mail,
+          daemon,
+          log_daemon,
+          auth,
+          log_auth,
+          syslog,
+          log_syslog,
+          lpr,
+          log_lpr,
+          news,
+          log_news,
+          uucp,
+          log_uucp,
+          cron,
+          log_cron,
+          authpriv,
+          log_authpriv,
+          ftp,
+          log_ftp,
+        ]
     - name: "structured"
       type: "StructuredLoggingConfiguration"
       default: true
@@ -1890,6 +1959,11 @@ logging:
 general:
   description: "General settings"
   parameters:
+    - name: "server_id"
+      type: String
+      default: ""
+      description: An identifier for this dnsdist instance, used in various places. Will be the server's hostname by default.
+      lua-name: "setServerID"
     - name: "edns_udp_payload_size_self_generated_answers"
       type: "u16"
       default: "1232"
@@ -1938,10 +2012,10 @@ general:
       lua-name: "addCapabilitiesToRetain"
       runtime-configurable: false
       description: |
-                   Accept a Linux capability as a string, or a list of these, to retain after startup so that privileged operations can still be performed at runtime.
-                     Keeping ``CAP_SYS_ADMIN`` on kernel 5.8+ for example allows loading eBPF programs and altering eBPF maps at runtime even if the ``kernel.unprivileged_bpf_disabled`` sysctl is set.
-                     Note that this does not grant the capabilities to the process, doing so might be done by running it as root which we don't advise, or by adding capabilities via the systemd unit file, for example.
-                     Please also be aware that switching to a different user via ``--uid`` will still drop all capabilities."
+        Accept a Linux capability as a string, or a list of these, to retain after startup so that privileged operations can still be performed at runtime.
+          Keeping ``CAP_SYS_ADMIN`` on kernel 5.8+ for example allows loading eBPF programs and altering eBPF maps at runtime even if the ``kernel.unprivileged_bpf_disabled`` sysctl is set.
+          Note that this does not grant the capabilities to the process, doing so might be done by running it as root which we don't advise, or by adding capabilities via the systemd unit file, for example.
+          Please also be aware that switching to a different user via ``--uid`` will still drop all capabilities."
 
 netmask_group:
   description: "Group of netmasks"

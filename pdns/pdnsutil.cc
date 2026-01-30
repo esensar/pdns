@@ -311,7 +311,7 @@ static const groupCommandDispatcher TSIGKEYCommands{
 static const groupCommandDispatcher viewsCommands{
   "Views",
   {{"list", {true, listView,
-    "",
+    "VIEW",
     "\tList all zones within VIEW"}},
    {"list-all", {true, listViews,
     "",
@@ -2770,7 +2770,11 @@ static int addOrReplaceRecord(bool isAdd, const vector<string>& cmds)
   }
 
   std::vector<std::pair<DNSResourceRecord, string>> errors;
-  Check::checkRRSet(oldrrs, newrrs, zone, allowUnderscores, errors);
+  Check::RRSetFlags flags{Check::RRSET_CHECK_TTL};
+  if (allowUnderscores) {
+    flags = static_cast<Check::RRSetFlags>(flags | Check::RRSET_ALLOW_UNDERSCORES);
+  }
+  Check::checkRRSet(oldrrs, newrrs, zone, flags, errors);
   oldrrs.clear(); // no longer needed
   if (!errors.empty()) {
     for (const auto& error : errors) {

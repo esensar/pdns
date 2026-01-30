@@ -25,8 +25,8 @@ ConnectionToBackend::~ConnectionToBackend()
           g_sessionCache.putSessions(d_ds->getID(), now.tv_sec, std::move(sessions));
         }
       }
-      catch (const std::exception& e) {
-        vinfolog("Unable to get a TLS session: %s", e.what());
+      catch (const std::exception&) {
+        /* not much to do here */
       }
     }
     auto diff = now - d_connectionStartTime;
@@ -39,7 +39,7 @@ bool ConnectionToBackend::reconnect()
 {
   std::unique_ptr<TLSSession> tlsSession{nullptr};
   if (d_handler) {
-    DEBUGLOG("closing socket "<<d_handler->getDescriptor());
+    DEBUGLOG("closing socket " << d_handler->getDescriptor());
     if (d_handler->isTLS()) {
       if (d_handler->hasTLSSessionBeenResumed()) {
         ++d_ds->tlsResumptions;
@@ -55,7 +55,8 @@ bool ConnectionToBackend::reconnect()
         }
       }
       catch (const std::exception& e) {
-        vinfolog("Unable to get a TLS session to resume: %s", e.what());
+        VERBOSESLOG(infolog("Unable to get a TLS session to resume: %s", e.what()),
+                    getLogger()->error(Logr::Info, e.what(), "Unable to get a TLS session to resume"));
       }
     }
     d_handler->close();
@@ -69,12 +70,12 @@ bool ConnectionToBackend::reconnect()
   d_proxyProtocolPayloadSent = false;
 
   do {
-    DEBUGLOG("TCP connecting to downstream "<<d_ds->getNameWithAddr()<<" ("<<d_downstreamFailures<<")");
-    DEBUGLOG("Opening TCP connection to backend "<<d_ds->getNameWithAddr());
+    DEBUGLOG("TCP connecting to downstream " << d_ds->getNameWithAddr() << " (" << d_downstreamFailures << ")");
+    DEBUGLOG("Opening TCP connection to backend " << d_ds->getNameWithAddr());
     ++d_ds->tcpNewConnections;
     try {
       auto socket = Socket(d_ds->d_config.remote.sin4.sin_family, SOCK_STREAM, 0);
-      DEBUGLOG("result of socket() is "<<socket.getHandle());
+      DEBUGLOG("result of socket() is " << socket.getHandle());
 
       /* disable NAGLE, which does not play nicely with delayed ACKs.
          In theory we could be wasting up to 500 milliseconds waiting for
@@ -87,7 +88,9 @@ bool ConnectionToBackend::reconnect()
       if (!d_ds->d_config.sourceItfName.empty()) {
         int res = setsockopt(socket.getHandle(), SOL_SOCKET, SO_BINDTODEVICE, d_ds->d_config.sourceItfName.c_str(), d_ds->d_config.sourceItfName.length());
         if (res != 0) {
-          vinfolog("Error setting up the interface on backend TCP socket '%s': %s", d_ds->getNameWithAddr(), stringerror());
+          int savederrno = errno;
+          VERBOSESLOG(infolog("Error setting up the interface on backend TCP socket '%s': %s", d_ds->getNameWithAddr(), stringerror(savederrno)),
+                      getLogger()->error(Logr::Info, savederrno, "Error setting up the interface on backend TCP socket"));
         }
       }
 #endif
@@ -104,7 +107,7 @@ bool ConnectionToBackend::reconnect()
       socket.setNonBlocking();
 
       gettimeofday(&d_connectionStartTime, nullptr);
-      auto handler = std::make_unique<TCPIOHandler>(d_ds->d_config.d_tlsSubjectName, d_ds->d_config.d_tlsSubjectIsAddr, socket.releaseHandle(), timeval{0,0}, d_ds->d_tlsCtx);
+      auto handler = std::make_unique<TCPIOHandler>(d_ds->d_config.d_tlsSubjectName, d_ds->d_config.d_tlsSubjectIsAddr, socket.releaseHandle(), timeval{0, 0}, d_ds->d_tlsCtx);
       if (!tlsSession && d_ds->d_tlsCtx) {
         tlsSession = g_sessionCache.getSession(d_ds->getID(), d_connectionStartTime.tv_sec);
       }
@@ -119,14 +122,14 @@ bool ConnectionToBackend::reconnect()
       return true;
     }
     catch (const std::runtime_error& e) {
-      vinfolog("Connection to downstream server %s failed: %s", d_ds->getNameWithAddr(), e.what());
+      VERBOSESLOG(infolog("Connection to downstream server %s failed: %s", d_ds->getNameWithAddr(), e.what()),
+                  getLogger()->error(Logr::Info, e.what(), "Connection to downstream backend server failed"));
       d_downstreamFailures++;
       if (d_downstreamFailures >= d_ds->d_config.d_retries) {
         throw;
       }
     }
-  }
-  while (d_downstreamFailures < d_ds->d_config.d_retries);
+  } while (d_downstreamFailures < d_ds->d_config.d_retries);
 
   return false;
 }
@@ -225,7 +228,8 @@ static void editPayloadID(PacketBuffer& payload, uint16_t newId, size_t proxyPro
   memcpy(&payload.at(startOfHeaderOffset), &id, sizeof(id));
 }
 
-enum class ConnectionState : uint8_t {
+enum class ConnectionState : uint8_t
+{
   needProxy,
   proxySent
 };
@@ -278,7 +282,7 @@ IOState TCPConnectionToBackend::sendQuery(std::shared_ptr<TCPConnectionToBackend
 {
   auto closer = conn->d_currentQuery.d_query.d_idstate.getCloser(classnamePrefix + __func__);
   (void)now;
-  DEBUGLOG("sending query to backend "<<conn->getDS()->getNameWithAddr()<<" over FD "<<conn->d_handler->getDescriptor());
+  DEBUGLOG("sending query to backend " << conn->getDS()->getNameWithAddr() << " over FD " << conn->d_handler->getDescriptor());
 
   IOState state = conn->d_handler->tryWrite(conn->d_currentQuery.d_query.d_buffer, conn->d_currentPos, conn->d_currentQuery.d_query.d_buffer.size());
 
@@ -295,7 +299,7 @@ IOState TCPConnectionToBackend::sendQuery(std::shared_ptr<TCPConnectionToBackend
   ++conn->d_queries;
   conn->d_currentPos = 0;
 
-  DEBUGLOG("adding a pending response for ID "<<conn->d_highestStreamID<<" and QNAME "<<conn->d_currentQuery.d_query.d_idstate.qname);
+  DEBUGLOG("adding a pending response for ID " << conn->d_highestStreamID << " and QNAME " << conn->d_currentQuery.d_query.d_idstate.qname);
   auto res = conn->d_pendingResponses.insert({conn->d_highestStreamID, std::move(conn->d_currentQuery)});
   /* if there was already a pending response with that ID, we messed up and we don't expect more
      than one response */
@@ -311,7 +315,7 @@ IOState TCPConnectionToBackend::sendQuery(std::shared_ptr<TCPConnectionToBackend
 
 void TCPConnectionToBackend::handleReconnectionAttempt(std::shared_ptr<TCPConnectionToBackend>& conn, const struct timeval& now, IOStateGuard& ioGuard, IOState& iostate, bool& reconnected, bool& connectionDied)
 {
-  DEBUGLOG("connection died, number of failures is "<<conn->d_downstreamFailures<<", retries is "<<conn->d_ds->d_config.d_retries);
+  DEBUGLOG("connection died, number of failures is " << conn->d_downstreamFailures << ", retries is " << conn->d_ds->d_config.d_retries);
 
   if (conn->d_downstreamFailures < conn->d_ds->d_config.d_retries) {
 
@@ -345,10 +349,12 @@ void TCPConnectionToBackend::handleReconnectionAttempt(std::shared_ptr<TCPConnec
               pending.second.d_sender->notifyIOError(now, std::move(response));
             }
             catch (const std::exception& exp) {
-              vinfolog("Got an exception while notifying: %s", exp.what());
+              VERBOSESLOG(infolog("Got an exception while notifying: %s", exp.what()),
+                          conn->getLogger()->error(Logr::Info, exp.what(), "Got an exception while notifying"));
             }
             catch (...) {
-              vinfolog("Got exception while notifying");
+              VERBOSESLOG(infolog("Got exception while notifying"),
+                          conn->getLogger()->info(Logr::Info, "Got an unknown exception while notifying"));
             }
           }
           else {
@@ -387,7 +393,6 @@ void TCPConnectionToBackend::handleReconnectionAttempt(std::shared_ptr<TCPConnec
   }
 }
 
-
 void TCPConnectionToBackend::handleIO(std::shared_ptr<TCPConnectionToBackend>& conn, const struct timeval& now)
 {
   if (conn->d_handler == nullptr) {
@@ -425,8 +430,7 @@ void TCPConnectionToBackend::handleIO(std::shared_ptr<TCPConnectionToBackend>& c
         }
       }
 
-      if (conn->d_state == State::waitingForResponseFromBackend ||
-          conn->d_state == State::readingResponseSizeFromBackend) {
+      if (conn->d_state == State::waitingForResponseFromBackend || conn->d_state == State::readingResponseSizeFromBackend) {
         DEBUGLOG("reading response size from backend");
         // then we need to allocate a new buffer (new because we might need to re-send the query if the
         // backend dies on us)
@@ -460,7 +464,8 @@ void TCPConnectionToBackend::handleIO(std::shared_ptr<TCPConnectionToBackend>& c
             iostate = conn->handleResponse(conn, now);
           }
           catch (const std::exception& e) {
-            vinfolog("Got an exception while handling TCP response from %s (client is %s): %s", conn->d_ds ? conn->d_ds->getNameWithAddr() : "unknown", conn->d_currentQuery.d_query.d_idstate.origRemote.toStringWithPort(), e.what());
+            VERBOSESLOG(infolog("Got an exception while handling TCP response from %s (client is %s): %s", conn->d_ds ? conn->d_ds->getNameWithAddr() : "unknown", conn->d_currentQuery.d_query.d_idstate.origRemote.toStringWithPort(), e.what()),
+                        conn->getLogger()->error(Logr::Info, e.what(), "Got an exception while handling TCP response from backend", "client.address", Logging::Loggable(conn->d_currentQuery.d_query.d_idstate.origRemote)));
             ioGuard.release();
             conn->release(true);
             return;
@@ -471,12 +476,9 @@ void TCPConnectionToBackend::handleIO(std::shared_ptr<TCPConnectionToBackend>& c
         }
       }
 
-      if (conn->d_state != State::idle &&
-          conn->d_state != State::sendingQueryToBackend &&
-          conn->d_state != State::waitingForResponseFromBackend &&
-          conn->d_state != State::readingResponseSizeFromBackend &&
-          conn->d_state != State::readingResponseFromBackend) {
-        vinfolog("Unexpected state %d in TCPConnectionToBackend::handleIO", static_cast<int>(conn->d_state));
+      if (conn->d_state != State::idle && conn->d_state != State::sendingQueryToBackend && conn->d_state != State::waitingForResponseFromBackend && conn->d_state != State::readingResponseSizeFromBackend && conn->d_state != State::readingResponseFromBackend) {
+        VERBOSESLOG(infolog("Unexpected state %d in TCPConnectionToBackend::handleIO", static_cast<int>(conn->d_state)),
+                    conn->getLogger()->info(Logr::Info, "Unexpected state in TCPConnectionToBackend::handleIO", "state", Logging::Loggable(static_cast<int>(conn->d_state))));
       }
     }
     catch (const std::exception& e) {
@@ -484,7 +486,8 @@ void TCPConnectionToBackend::handleIO(std::shared_ptr<TCPConnectionToBackend>& c
          but it might also be a real IO error or something else.
          Let's just drop the connection
       */
-      vinfolog("Got an exception while handling (%s backend) TCP query from %s: %s", (conn->d_state == State::sendingQueryToBackend ? "writing to" : "reading from"), conn->d_currentQuery.d_query.d_idstate.origRemote.toStringWithPort(), e.what());
+      VERBOSESLOG(infolog("Got an exception while handling (%s backend) TCP query from %s: %s", (conn->d_state == State::sendingQueryToBackend ? "writing to" : "reading from"), conn->d_currentQuery.d_query.d_idstate.origRemote.toStringWithPort(), e.what()),
+                  conn->getLogger()->error(Logr::Info, e.what(), "Got an exception while handling TCP communication with backend", "client.address", Logging::Loggable(conn->d_currentQuery.d_query.d_idstate.origRemote), "io_operation", Logging::Loggable(conn->d_state == State::sendingQueryToBackend ? "writing to" : "reading from")));
 
       if (conn->d_state == State::sendingQueryToBackend) {
         ++conn->d_ds->tcpDiedSendingQuery;
@@ -527,8 +530,7 @@ void TCPConnectionToBackend::handleIO(std::shared_ptr<TCPConnectionToBackend>& c
         conn->d_ioState->update(iostate, handleIOCallback, conn, ttd);
       }
     }
-  }
-  while (reconnected || (iostate != IOState::Done && !conn->d_connectionDied && !conn->d_lastIOBlocked));
+  } while (reconnected || (iostate != IOState::Done && !conn->d_connectionDied && !conn->d_lastIOBlocked));
 
   ioGuard.release();
 }
@@ -555,7 +557,7 @@ void TCPConnectionToBackend::queueQuery(std::shared_ptr<TCPQuerySender>& sender,
   // if we are not already sending a query or in the middle of reading a response (so idle),
   // start sending the query
   if (d_state == State::idle || d_state == State::waitingForResponseFromBackend) {
-    DEBUGLOG("Sending new query to backend right away, with ID "<<d_highestStreamID);
+    DEBUGLOG("Sending new query to backend right away, with ID " << d_highestStreamID);
     d_state = State::sendingQueryToBackend;
     d_currentPos = 0;
 
@@ -571,7 +573,7 @@ void TCPConnectionToBackend::queueQuery(std::shared_ptr<TCPQuerySender>& sender,
     handleIO(shared, now);
   }
   else {
-    DEBUGLOG("Adding new query to the queue because we are in state "<<(int)d_state);
+    DEBUGLOG("Adding new query to the queue because we are in state " << (int)d_state);
     // store query in the list of queries to send
     d_pendingQueries.push_back(PendingRequest({sender, std::move(query)}));
   }
@@ -583,26 +585,31 @@ void TCPConnectionToBackend::handleTimeout(const struct timeval& now, bool write
   if (write) {
     if (isFresh() && d_queries == 0) {
       ++d_ds->tcpConnectTimeouts;
-      vinfolog("Timeout while connecting to TCP backend %s", d_ds->getNameWithAddr());
+      VERBOSESLOG(infolog("Timeout while connecting to TCP backend %s", d_ds->getNameWithAddr()),
+                  getLogger()->info(Logr::Info, "Timeout while connecting to TCP backend"));
     }
     else {
       ++d_ds->tcpWriteTimeouts;
-      vinfolog("Timeout while writing to TCP backend %s", d_ds->getNameWithAddr());
+      VERBOSESLOG(infolog("Timeout while writing to TCP backend %s", d_ds->getNameWithAddr()),
+                  getLogger()->info(Logr::Info, "Timeout while writing to TCP backend"));
     }
   }
   else {
     ++d_ds->tcpReadTimeouts;
-    vinfolog("Timeout while reading from TCP backend %s", d_ds->getNameWithAddr());
+    VERBOSESLOG(infolog("Timeout while reading from TCP backend %s", d_ds->getNameWithAddr()),
+                getLogger()->info(Logr::Info, "Timeout while reading from TCP backend"));
   }
 
   try {
     notifyAllQueriesFailed(now, FailureReason::timeout);
   }
   catch (const std::exception& e) {
-    vinfolog("Got an exception while notifying a timeout: %s", e.what());
+    VERBOSESLOG(infolog("Got an exception while notifying a timeout: %s", e.what()),
+                getLogger()->error(Logr::Info, e.what(), "Got an exception while notifying a timeout from a backend"));
   }
   catch (...) {
-    vinfolog("Got exception while notifying a timeout");
+    VERBOSESLOG(infolog("Got exception while notifying a timeout"),
+                getLogger()->info(Logr::Info, "Got an unknown exception while notifying a timeout from a backend"));
   }
 
   release(true);
@@ -671,10 +678,12 @@ void TCPConnectionToBackend::notifyAllQueriesFailed(const struct timeval& now, F
     }
   }
   catch (const std::exception& e) {
-    vinfolog("Got an exception while notifying: %s", e.what());
+    VERBOSESLOG(infolog("Got an exception while notifying: %s", e.what()),
+                getLogger()->error(Logr::Info, e.what(), "Got an exception while notifying a timeout from a backend"));
   }
   catch (...) {
-    vinfolog("Got exception while notifying");
+    VERBOSESLOG(infolog("Got exception while notifying"),
+                getLogger()->info(Logr::Info, "Got an unknown exception while notifying a timeout from a backend"));
   }
 
   release(true);
@@ -696,7 +705,7 @@ IOState TCPConnectionToBackend::handleResponse(std::shared_ptr<TCPConnectionToBa
 
   auto it = d_pendingResponses.find(queryId);
   if (it == d_pendingResponses.end()) {
-    DEBUGLOG("could not find any corresponding query for ID "<<queryId<<". This is likely a duplicated ID over the same TCP connection, giving up!");
+    DEBUGLOG("could not find any corresponding query for ID " << queryId << ". This is likely a duplicated ID over the same TCP connection, giving up!");
     notifyAllQueriesFailed(now, FailureReason::unexpectedQueryID);
     return IOState::Done;
   }
@@ -716,7 +725,7 @@ IOState TCPConnectionToBackend::handleResponse(std::shared_ptr<TCPConnectionToBa
     const auto& queryIDS = it->second.d_query.d_idstate;
     /* we don't move the whole IDS because we will need it for the responses to come */
     response.d_idstate = queryIDS.partialCloneForXFR();
-    DEBUGLOG("passing XFRresponse to client connection for "<<response.d_idstate.qname);
+    DEBUGLOG("passing XFRresponse to client connection for " << response.d_idstate.qname);
 
     it->second.d_query.d_xfrStarted = true;
     done = isXFRFinished(response, it->second.d_query);
@@ -774,7 +783,7 @@ IOState TCPConnectionToBackend::handleResponse(std::shared_ptr<TCPConnectionToBa
   // anything without checking first
   auto shared = conn;
   if (sender->active()) {
-    DEBUGLOG("passing response to client connection for "<<ids.qname);
+    DEBUGLOG("passing response to client connection for " << ids.qname);
     // make sure that we still exist after calling handleResponse()
     TCPResponse response(std::move(d_responseBuffer), std::move(ids), conn, conn->d_ds);
     sender->handleResponse(now, std::move(response));
@@ -896,6 +905,21 @@ bool TCPConnectionToBackend::isXFRFinished(const TCPResponse& response, TCPQuery
     /* ponder what to do here, shall we close the connection? */
   }
   return done;
+}
+
+std::shared_ptr<const Logr::Logger> ConnectionToBackend::getLogger() const
+{
+  auto logger = dnsdist::logging::getTopLogger("outgoing-tcp-connection")->withValues("fresh_connection", Logging::Loggable(d_fresh), "tcp_fast_open", Logging::Loggable(d_enableFastOpen), "proxy_protocol_payload_sent", Logging::Loggable(d_proxyProtocolPayloadSent), "downstream_failures", Logging::Loggable(d_downstreamFailures), "highest_stream_id", Logging::Loggable(d_highestStreamID), "queries_count", Logging::Loggable(d_queries), "io_state", Logging::Loggable(d_ioState ? d_ioState->getState() : "empty"));
+  if (d_ds) {
+    logger = logger->withValues("backend.address", Logging::Loggable(d_ds->d_config.remote), "backend.name", Logging::Loggable(d_ds->getName()));
+  }
+
+  return logger;
+}
+
+std::shared_ptr<const Logr::Logger> TCPConnectionToBackend::getLogger() const
+{
+  return ConnectionToBackend::getLogger()->withValues("state", Logging::Loggable(static_cast<int>(d_state)), "pending_queries", Logging::Loggable(d_pendingQueries.size()), "pending_responses", Logging::Loggable(d_pendingResponses.size()));
 }
 
 void setTCPDownstreamMaxIdleConnectionsPerBackend(uint64_t max)

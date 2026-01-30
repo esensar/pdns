@@ -35,61 +35,61 @@ conf.set_quoted(
 conf.set_quoted('PACKAGE_VERSION', meson.project_version(), description: 'version')
 
 # Feature detection and system configuration
-subdir('meson' / 'config') # Config
-subdir('meson' / 'version') # Generate version define
-subdir('meson' / 'compiler-setup') # Common compiler setup
-subdir('meson' / 'dlopen') # our Rust static library needs dlopen (needs to happen _after_ compiler-setup)
-subdir('meson' / 'summary') # Print a system/project summary
-subdir('meson' / 'sysconfdir') # Sysconfdir
-subdir('meson' / 'platform') # Platform detection
-subdir('meson' / 'atomics') # Check atomics support
-subdir('meson' / 'pthread-headers') # Check pthread headers
-subdir('meson' / 'pthread-setname') # Pthread setname madness
-subdir('meson' / 'pthread-np') # Pthread _np functions
-subdir('meson' / 'strerror') # Strerror_r
-subdir('meson' / 'lua') # Lua
-subdir('meson' / 'hardening') # Hardening
-subdir('meson' / 'net-libs') # Network Libraries
-subdir('meson' / 'tm-gmtoff') # Check for tm_gmtoff field in struct tm
-subdir('meson' / 'mmap') # Check for mmap
-subdir('meson' / 'libcap') # Libcap to drop capabilities
-subdir('meson' / 'libedit') # Libedit
-subdir('meson' / 'libsodium') # Libsodium
-subdir('meson' / 'libcrypto') # OpenSSL libcrypto
-subdir('meson' / 'libssl') # OpenSSL libssl
-subdir('meson' / 'libssl-engines') # OpenSSL libssl engines
-subdir('meson' / 'libssl-providers') # OpenSSL libssl providers
-subdir('meson' / 'libsnmp') # SNMP
-subdir('meson' / 'clock-gettime') # Clock_gettime
-subdir('meson' / 'boost') # Boost
-subdir('meson' / 'boost-test') # Boost Testing Library
-subdir('meson' / 'reproducible') # Reproducible Builds
-subdir('meson' / 'libsystemd') # Systemd notification
-subdir('meson' / 'systemd') # Systemd and unit file handling
-subdir('meson' / 'code-coverage') # Code coverage
-subdir('meson' / 'auto-var-init') # Automatic Variable Initialization
-subdir('meson' / 'sanitizers') # Sanitizers
-subdir('meson' / 'various-functions') # Various Functions
-subdir('meson' / 'various-headers') # Various Headers
-subdir('meson' / 'dnstap') # DNSTAP through libfstream
-subdir('meson' / 'dnscrypt') # DNSCrypt through libsodium
-subdir('meson' / 'ipcipher') # IPCipher (requires libcrypto)
-subdir('meson' / 'cdb') # CDB
-subdir('meson' / 'ebpf') # eBPF
-subdir('meson' / 'gnutls') # GNUTLS
-subdir('meson' / 'h2o') # H2O
-subdir('meson' / 'lmdb') # LMDB
-subdir('meson' / 'nghttp2') # NGHTTP2
-subdir('meson' / 'quiche') # Quiche
-subdir('meson' / 're2') # RE2
-subdir('meson' / 'xsk') # BPF and XDP for XSK
-subdir('meson' / 'dot') # DNS over TLS
-subdir('meson' / 'doh2') # DNS over HTTP/2
-subdir('meson' / 'doq') # DNS over QUIC
-subdir('meson' / 'doh3') # DNS over HTTP/3
-subdir('meson' / 'yaml-configuration') # YAML configuration
-subdir('meson' / 'redis') # Redis
-subdir('meson' / 'mmdb') # MMDB (MaxmindDB)
+subdir('meson' / 'config')                  # Config
+subdir('meson' / 'version')                 # Generate version define
+subdir('meson' / 'compiler-setup')          # Common compiler setup
+subdir('meson' / 'dlopen')                  # our Rust static library needs dlopen (needs to happen _after_ compiler-setup)
+subdir('meson' / 'summary')                 # Print a system/project summary
+subdir('meson' / 'sysconfdir')              # Sysconfdir
+subdir('meson' / 'platform')                # Platform detection
+subdir('meson' / 'atomics')                 # Check atomics support
+subdir('meson' / 'pthread-headers')         # Check pthread headers
+subdir('meson' / 'pthread-setname')         # Pthread setname madness
+subdir('meson' / 'pthread-np')              # Pthread _np functions
+subdir('meson' / 'strerror')                # Strerror_r
+subdir('meson' / 'lua')                     # Lua
+subdir('meson' / 'hardening')               # Hardening
+subdir('meson' / 'net-libs')                # Network Libraries
+subdir('meson' / 'tm-gmtoff')               # Check for tm_gmtoff field in struct tm
+subdir('meson' / 'mmap')                    # Check for mmap
+subdir('meson' / 'libcap')                  # Libcap to drop capabilities
+subdir('meson' / 'libedit')                 # Libedit
+subdir('meson' / 'libsodium')               # Libsodium
+subdir('meson' / 'libcrypto')               # OpenSSL libcrypto
+subdir('meson' / 'libssl')                  # OpenSSL libssl
+subdir('meson' / 'libssl-engines')          # OpenSSL libssl engines
+subdir('meson' / 'libssl-providers')        # OpenSSL libssl providers
+subdir('meson' / 'libsnmp')                 # SNMP
+subdir('meson' / 'clock-gettime')           # Clock_gettime
+subdir('meson' / 'boost')                   # Boost
+subdir('meson' / 'boost-test')              # Boost Testing Library
+subdir('meson' / 'reproducible')            # Reproducible Builds
+subdir('meson' / 'libsystemd')              # Systemd notification
+subdir('meson' / 'systemd')                 # Systemd and unit file handling
+subdir('meson' / 'code-coverage')           # Code coverage
+subdir('meson' / 'auto-var-init')           # Automatic Variable Initialization
+subdir('meson' / 'sanitizers')              # Sanitizers
+subdir('meson' / 'various-functions')       # Various Functions
+subdir('meson' / 'various-headers')         # Various Headers
+subdir('meson' / 'dnstap')                  # DNSTAP through libfstream
+subdir('meson' / 'dnscrypt')                # DNSCrypt through libsodium
+subdir('meson' / 'ipcipher')                # IPCipher (requires libcrypto)
+subdir('meson' / 'cdb')                     # CDB
+subdir('meson' / 'ebpf')                    # eBPF
+subdir('meson' / 'gnutls')                  # GNUTLS
+subdir('meson' / 'lmdb')                    # LMDB
+subdir('meson' / 'nghttp2')                 # NGHTTP2
+subdir('meson' / 'quiche')                  # Quiche
+subdir('meson' / 're2')                     # RE2
+subdir('meson' / 'xsk')                     # BPF and XDP for XSK
+subdir('meson' / 'dot')                     # DNS over TLS
+subdir('meson' / 'doh2')                    # DNS over HTTP/2
+subdir('meson' / 'doq')                     # DNS over QUIC
+subdir('meson' / 'doh3')                    # DNS over HTTP/3
+subdir('meson' / 'yaml-configuration')      # YAML configuration
+subdir('meson' / 'catch2')                  # Microbenchmark
+subdir('meson' / 'redis')                   # Redis
+subdir('meson' / 'mmdb')                    # MMDB (MaxmindDB)
 
 common_sources = []
 
@@ -153,6 +153,7 @@ common_sources += files(
   src_dir / 'dnsdist-ipcrypt2.cc',
   src_dir / 'dnsdist-kvs.cc',
   src_dir / 'dnsdist-lbpolicies.cc',
+  src_dir / 'dnsdist-logging.cc',
   src_dir / 'dnsdist-lua-actions.cc',
   src_dir / 'dnsdist-lua-bindings.cc',
   src_dir / 'dnsdist-lua-bindings-dnscrypt.cc',
@@ -210,6 +211,7 @@ common_sources += files(
   src_dir / 'gettime.cc',
   src_dir / 'iputils.cc',
   src_dir / 'libssl.cc',
+  src_dir / 'logging.cc',
   src_dir / 'misc.cc',
   src_dir / 'protozero.cc',
   src_dir / 'protozero-trace.cc',
@@ -232,12 +234,6 @@ conditional_sources = {
       src_dir / 'cdb.cc',
     ],
     'condition': dep_cdb.found(),
-  },
-  'doh': {
-    'sources': [
-      src_dir / 'doh.cc',
-    ],
-    'condition': dep_libh2o_evloop.found(),
   },
   'doq': {
     'sources': [
@@ -409,7 +405,6 @@ deps = [
   dep_libcrypto,
   dep_gnutls,
   dep_libedit,
-  dep_libh2o_evloop,
   dep_json11,
   dep_libnghttp2,
   dep_libquiche,
@@ -522,18 +517,20 @@ if get_option('fuzz-targets')
   }
   if get_option('xsk').allowed() and dep_libbpf.found() and dep_libxdp.found()
     tools += {
-      'fuzz-target-xsk': {
-        'main': src_dir / 'fuzz_xsk.cc',
-        'link-args': fuzzer_ldflags,
-        'files-extra': fuzz_extra_sources
-        + [
-          src_dir / 'dnsname.cc',
-          src_dir / 'gettime.cc',
-          src_dir / 'iputils.cc',
-          src_dir / 'misc.cc',
-          src_dir / 'xsk.cc',
-        ],
-      },
+      'fuzz-target-xsk' : {
+         'main': src_dir / 'fuzz_xsk.cc',
+         'link-args': fuzzer_ldflags,
+         'files-extra': fuzz_extra_sources + [
+           src_dir / 'dnsname.cc',
+           src_dir / 'gettime.cc',
+           src_dir / 'iputils.cc',
+           src_dir / 'misc.cc',
+           src_dir / 'xsk.cc'
+           ],
+        'deps-extra': [
+           dep_libsystemd,
+         ]
+       },
     }
   endif
 endif
@@ -598,25 +595,60 @@ if get_option('unit-tests')
   )
   tools += {
     'testrunner': {
+        'main': [
+          src_dir / 'testrunner.cc',
+          mplexer_sources,
+        ],
+        'files-extra': [
+          # FFI files are directly added to the binary, because otherwise the visibility
+          # is ignored and the functions that are not used in the binary are not exported
+          src_dir / 'dnsdist-lua-ffi.cc',
+        ],
+        'deps-extra': [
+          libdnsdist_test,
+          dep_boost_test,
+          dep_ffi_interface,
+          dep_lua,
+          dep_probds,
+          dep_protozero,
+          dep_libsystemd, # because of the journal logging backend
+          dep_yahttp,
+        ],
+    }
+  }
+endif
+
+benchmark_sources = files(
+  src_dir / 'bench-dnsdist-action-rcode.cc',
+  src_dir / 'bench-dnsdist-dnsparser_cc.cc',
+  src_dir / 'bench-dnsdist-opentelemetry_cc.cc',
+  src_dir / 'bench-dnsdist-rings_cc.cc',
+  src_dir / 'bench-misc_hh.cc',
+)
+
+if get_option('benchmark')
+  tools += {
+    'benchmarkrunner' : {
       'main': [
-        src_dir / 'testrunner.cc',
-        mplexer_sources,
+        src_dir / 'benchmarkrunner.cc',
       ],
       'files-extra': [
-        # FFI files are directly added to the binary, because otherwise the visibility
-        # is ignored and the functions that are not used in the binary are not exported
+        benchmark_sources,
+        config_h,
+        mplexer_sources,
+        src_dir / 'dnsdist-lbpolicies.cc',
         src_dir / 'dnsdist-lua-ffi.cc',
+        src_dir / 'dnstap.cc',
+        src_dir / 'fstrm_logger.cc',
       ],
       'deps-extra': [
-        libdnsdist_test,
-        dep_boost_test,
+        dep_catch2,
+        dep_dnstap,
         dep_ffi_interface,
         dep_lua,
-        dep_probds,
         dep_protozero,
-        dep_yahttp,
       ],
-    },
+    }
   }
 endif
 
@@ -657,6 +689,10 @@ endforeach
 
 if get_option('unit-tests')
   test('testrunner', testrunner)
+endif
+
+if get_option('benchmark')
+  benchmark('benchmarkrunner', benchmarkrunner, timeout:240)
 endif
 
 # Man-pages.
@@ -813,6 +849,11 @@ install_data(
   'dnsdist.conf-dist',
   install_dir: get_option('sysconfdir'),
   follow_symlinks: true,
+)
+install_data(
+  'dnsdist.yml-dist',
+  install_dir : get_option('sysconfdir'),
+  follow_symlinks: true
 )
 
 if python_venv.found()

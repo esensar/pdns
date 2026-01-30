@@ -50,11 +50,11 @@ BuildRequires: net-snmp-devel
 
 %if 0%{?suse_version}
 Requires(pre): shadow
-%systemd_requires
+%{?systemd_requires}
 %endif
 Requires(pre): shadow-utils
 BuildRequires: fstrm-devel
-%systemd_requires
+%{?systemd_requires}
 %if ( "%{_arch}" != "aarch64" && 0%{?rhel} >= 8 ) || ( "%{_arch}" == "aarch64" && 0%{?rhel} >= 9 )
 BuildRequires: libbpf-devel
 BuildRequires: libxdp-devel
@@ -147,6 +147,7 @@ install -d %{buildroot}/%{_sysconfdir}/dnsdist
 install -Dm644 %{_libdir}/libdnsdist-quiche.so %{buildroot}/%{_libdir}/libdnsdist-quiche.so
 %{__mv} %{buildroot}%{_sysconfdir}/dnsdist/dnsdist.conf-dist %{buildroot}%{_sysconfdir}/dnsdist/dnsdist.conf
 chmod 0640 %{buildroot}/%{_sysconfdir}/dnsdist/dnsdist.conf
+chmod 0640 %{buildroot}/%{_sysconfdir}/dnsdist/dnsdist.yml-dist
 
 %{__install } -d %{buildroot}/%{_sharedstatedir}/%{name}
 
@@ -189,5 +190,6 @@ systemctl daemon-reload ||:
 %{_mandir}/man1/*
 %dir %{_sysconfdir}/dnsdist
 %attr(-, root, dnsdist) %config(noreplace) %{_sysconfdir}/%{name}/dnsdist.conf
+%attr(-, root, dnsdist) %config(noreplace) %{_sysconfdir}/%{name}/dnsdist.yml-dist
 %dir %attr(-,dnsdist,dnsdist) %{_sharedstatedir}/%{name}
 %{_unitdir}/dnsdist*

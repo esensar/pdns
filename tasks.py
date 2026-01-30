@@ -77,9 +77,9 @@ rec_bulk_deps = [
 rec_bulk_ubicloud_deps = [
     'curl',
     'bind9-dnsutils',
-    'libboost-context1.74.0',
-    'libboost-system1.74.0',
-    'libboost-filesystem1.74.0',
+    'libboost-context1.83.0',
+    'libboost-system1.83.0',
+    'libboost-filesystem1.83.0',
     'libcap2',
     'libfstrm0',
     'libluajit-5.1-2',
@@ -112,7 +112,6 @@ auth_test_deps = [   # FIXME: we should be generating some of these from shlibde
     'curl',
     'default-jre-headless',
     'bind9-dnsutils',
-    'datefudge',
     'gawk',
     'krb5-user',
     'ldnsutils',
@@ -249,6 +248,13 @@ def setup_authbind(c):
     c.sudo('touch /etc/authbind/byport/!853')
     c.sudo('chmod 755 /etc/authbind/byport/!853')
 
+# Builds and installs libfaketime from wolfcw/libfaketime (master)
+def build_and_install_libfaketime(c):
+    c.run(f'git clone https://github.com/wolfcw/libfaketime.git {repo_home}/libfaketime')
+    with c.cd(f'{repo_home}/libfaketime'):
+        c.run('git checkout master')
+        c.run('make && sudo make install')
+
 auth_backend_test_deps = dict(
     gsqlite3=['sqlite3'],
     gmysql=['default-libmysqlclient-dev'],
@@ -273,6 +279,8 @@ def install_auth_test_deps_only(c, backend):
         extra.extend(auth_backend_test_deps[b])
     c.sudo('apt-get update')
     c.sudo('DEBIAN_FRONTEND=noninteractive apt-get -y install ' + ' '.join(extra+auth_test_deps))
+    # install libfaketime manually
+    build_and_install_libfaketime(c)
 
 @task(help={'backend': 'Backend to install test deps for, e.g. gsqlite3; can be repeated'}, iterable=['backend'], optional=['backend'])
 def install_auth_test_deps(c, backend): # FIXME: rename this, we do way more than apt-get
@@ -303,7 +311,7 @@ def install_rec_bulk_ubicloud_deps(c): # FIXME: rename this, we do way more than
 def install_rec_test_deps(c): # FIXME: rename this, we do way more than apt-get
     c.sudo('apt-get --no-install-recommends install -y ' + ' '.join(rec_bulk_deps) + ' \
               pdns-server pdns-backend-bind daemontools \
-              jq libfaketime lua-posix lua-socket bc authbind \
+              jq lua-posix lua-socket bc authbind \
               python3-venv python3-dev default-libmysqlclient-dev libpq-dev \
               protobuf-compiler snmpd prometheus')
     c.run('chmod +x /opt/pdns-recursor/bin/* /opt/pdns-recursor/sbin/*')
@@ -314,6 +322,8 @@ def install_rec_test_deps(c): # FIXME: rename this, we do way more than apt-get
     c.sudo('/etc/init.d/snmpd restart')
     time.sleep(5)
     c.sudo('chmod 755 /var/agentx')
+    # install libfaketime manually
+    build_and_install_libfaketime(c)
 
 @task(optional=['skipXDP'])
 def install_dnsdist_test_deps(c, skipXDP=False): # FIXME: rename this, we do way more than apt-get
@@ -340,7 +350,6 @@ def install_dnsdist_test_deps(c, skipXDP=False): # FIXME: rename this, we do way
                libxdp1'
 
     c.sudo(f'apt-get install -y {deps}')
-    ci_install_libh2o(c)
     c.run('sed "s/agentxperms 0700 0755 dnsdist/agentxperms 0777 0755/g" regression-tests.dnsdist/snmpd.conf | sudo tee /etc/snmp/snmpd.conf')
     c.sudo('/etc/init.d/snmpd restart')
     time.sleep(5)
@@ -353,7 +362,6 @@ def install_rec_build_deps(c):
 @task(optional=['skipXDP'])
 def install_dnsdist_build_deps(c, skipXDP=False):
     c.sudo('apt-get install -y --no-install-recommends ' +  ' '.join(all_build_deps + git_build_deps + dnsdist_build_deps + (dnsdist_xdp_build_deps if not skipXDP else [])))
-    ci_install_libh2o(c)
 
 @task
 def ci_autoconf(c, meson=False):
@@ -762,7 +770,6 @@ def ci_dnsdist_configure_autotools(features, additional_flags, additional_ld_fla
                       --enable-yaml \
                       --prefix=/opt/dnsdist \
                       --with-gnutls \
-                      --with-h2o \
                       --with-libsodium \
                       --with-lua=luajit \
                       --with-libcap \
@@ -777,7 +784,6 @@ def ci_dnsdist_configure_autotools(features, additional_flags, additional_ld_fla
                       --without-cdb \
                       --without-ebpf \
                       --without-gnutls \
-                      --without-h2o \
                       --without-libedit \
                       --without-libsodium \
                       --without-lmdb \
@@ -804,7 +810,6 @@ def ci_dnsdist_configure_meson(c, features, additional_flags, additional_ld_flag
                       -D dnscrypt=enabled \
                       -D dnstap=enabled \
                       -D ebpf=enabled \
-                      -D h2o=enabled \
                       -D ipcipher=enabled \
                       -D ipcrypt2=enabled \
                       -D libedit=enabled \
@@ -826,7 +831,6 @@ def ci_dnsdist_configure_meson(c, features, additional_flags, additional_ld_flag
                       -D dnscrypt=disabled \
                       -D dnstap=disabled \
                       -D ebpf=disabled \
-                      -D h2o=disabled \
                       -D ipcipher=disabled \
                       -D ipcrypt2=disabled \
                       -D libedit=disabled \
@@ -1275,23 +1279,6 @@ def coverity_upload(c, email, project, tarball):
             --form version="$(./builder-support/gen-version)" \
             --form description="master build" \
             https://scan.coverity.com/builds?project={project}', hide=True)
-
-def build_and_install_libh2o(c):
-    with c.cd(f'{repo_home}/builder-support/helpers/'):
-        c.run('sudo sh install_h2o.sh')
-
-    c.run("sudo mkdir -p /usr/lib/pkgconfig")
-    c.run("sudo cp /opt/lib/pkgconfig/libh2o-evloop.pc /usr/lib/pkgconfig/libh2o-evloop.pc")
-
-@task
-def ci_install_libh2o(c):
-    libh2o_package_name = "libh2o-evloop-dev" # also installs libh2o-evloop0.13 on Debian 11 & 12
-    res = c.run(f'apt-cache policy {libh2o_package_name} | grep -qq Candidate && echo "True" || echo ""')
-
-    if bool(res.stdout.strip()):
-        c.run(f'sudo apt-get install -y {libh2o_package_name}')
-    else:
-        build_and_install_libh2o(c)
 
 @task
 def ci_build_and_install_quiche(c, repo):
