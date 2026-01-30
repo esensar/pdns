@@ -96,7 +96,7 @@ dnsdist_build_deps = [
     'libh2o-evloop-dev',
     'libhiredis-dev',
     'liblmdb-dev',
-    'libmaxminddb-dev'
+    'libmaxminddb-dev',
     'libnghttp2-dev',
     'libre2-dev',
     'libsnmp-dev',
