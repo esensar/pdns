@@ -96,7 +96,9 @@ dnsdist_build_deps = [
     'libedit-dev',
     'libfstrm-dev',
     'libgnutls28-dev',
+    'libhiredis-dev',
     'liblmdb-dev',
+    'libmaxminddb-dev'
     'libnghttp2-dev',
     'libre2-dev',
     'libsnmp-dev',
