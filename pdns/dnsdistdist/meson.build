@@ -580,7 +580,6 @@ if get_option('unit-tests')
       dependencies: [
           dep_boost,
           dep_boost_test,
-          dep_ipcrypt2,
           dep_lua,
           dep_protozero,
           dep_yahttp,
