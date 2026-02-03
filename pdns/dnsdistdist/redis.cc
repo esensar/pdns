@@ -602,9 +602,8 @@ bool CopyCachingRedisClient::getValue(const std::string& key, std::string& value
     return true;
   }
 
-  auto found = false;
+  auto found = d_client->getValue(key, value);
   if (d_copyCache->needsUpdate()) {
-    found = d_client->getValue(key, value);
     d_copyCache->insertBatch(d_client->generateCopyCache());
   }
   return found;
@@ -622,12 +621,7 @@ bool CopyCachingRedisClient::keyExists(const std::string& key)
   }
 
   // No value to store in the cache here, so just return
-  auto found = false;
-  if (d_copyCache->needsUpdate()) {
-    found = d_client->keyExists(key);
-    d_copyCache->insertBatch(d_client->generateCopyCache());
-  }
-  return found;
+  return d_client->keyExists(key);
 }
 
 bool FilteringCopyCachingRedisClient::getValue(const std::string& key, std::string& value)
