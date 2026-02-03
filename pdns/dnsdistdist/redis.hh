@@ -40,7 +40,7 @@ template <typename T>
 class RedisReplyInterface
 {
 public:
-  virtual ~RedisReplyInterface() {};
+  virtual ~RedisReplyInterface(){};
   virtual bool ok() const = 0;
   virtual T getValue() const = 0;
   virtual std::string getError() const = 0;
@@ -85,7 +85,7 @@ class MappedRedisReply : public RedisReplyInterface<T>
 {
 public:
   MappedRedisReply(std::unique_ptr<RedisReplyInterface<S>> inner) :
-    d_inner(std::move(inner)) {};
+    d_inner(std::move(inner)){};
 
   virtual bool ok() const override
   {
@@ -510,7 +510,7 @@ class RedisLookupAction
 {
 public:
   RedisLookupAction(const std::string& cache_id) :
-    d_cacheId(cache_id) {};
+    d_cacheId(cache_id){};
   virtual ~RedisLookupAction() = default;
 
   const std::string& getCacheId() const
@@ -800,7 +800,7 @@ public:
 private:
   SharedLockGuarded<std::unordered_map<std::string, std::string>> d_map{};
   const unsigned int d_ttl;
-  unsigned int d_lastInsert;
+  unsigned int d_lastInsert{};
   GenericCacheInterface<std::string, std::string>::Stats d_stats{"filter=\"none\""};
 };
 
