@@ -39,9 +39,12 @@
 #include <algorithm>
 #include <bitset>
 #include <unistd.h>
+
+#if !defined(RUST_WS)
 #include <filesystem>
 
 namespace filesystem = std::filesystem;
+#endif
 
 json11::Json HttpRequest::json()
 {
@@ -163,7 +166,7 @@ void WebServer::apiWrapper(const WebServer::HandlerFunction& handler, HttpReques
     throw HttpUnauthorizedException("X-API-Key");
   }
 
-  bool auth_ok = req->compareHeader("x-api-key", *d_apikey) || d_apikey->matches(req->getvars["api-key"]);
+  bool auth_ok = req->compareHeader("x-api-key", *d_apikey);
 
   if (!auth_ok && allowPassword) {
     if (d_webserverPassword) {

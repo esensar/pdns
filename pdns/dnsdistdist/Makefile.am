@@ -14,6 +14,7 @@ AM_CPPFLAGS += $(SYSTEMD_CFLAGS) \
 	-I$(top_srcdir)/dnsdist-rust-lib/rust/src \
 	-DSYSCONFDIR=\"${sysconfdir}\" \
 	-DBOOST_CONTAINER_USE_STD_EXCEPTIONS
+AM_CXXFLAGS =
 
 DNSDIST_RUST_LIBS = $(top_builddir)/dnsdist-rust-lib/rust/libdnsdist_rust.a $(LIBDL)
 PROBDS_LIBS = $(top_builddir)/ext/probds/libprobds.la
@@ -27,6 +28,10 @@ SUBDIRS=dnsdist-rust-lib \
 	ext/ipcrypt2 \
 	ext/probds \
 	ext/yahttp
+
+if HAVE_IPCRYPT2
+SUBDIRS += ext/ipcrypt2
+endif
 
 CLEANFILES = \
 	htmlfiles.h.tmp \
@@ -79,7 +84,7 @@ min_js: $(MIN_JS_FILES)
 if HAVE_RE2
 # Some versions of pkg_config add -std=c11++, override that
 AM_CPPFLAGS += $(RE2_CFLAGS)
-AM_CPPFLAGS += -std=c++17
+AM_CXXFLAGS += $(RE2_CFLAGS) -std=c++17
 endif
 
 if HAVE_DNS_OVER_TLS
@@ -113,9 +118,6 @@ if HAVE_GNUTLS
 AM_CPPFLAGS += $(GNUTLS_CFLAGS)
 endif
 
-if HAVE_LIBH2OEVLOOP
-AM_CPPFLAGS += $(LIBH2OEVLOOP_CFLAGS)
-endif
 endif
 
 EXTRA_DIST=COPYING \
@@ -213,6 +215,7 @@ dnsdist_SOURCES = \
 	dnsdist-ipcrypt2.cc dnsdist-ipcrypt2.hh \
 	dnsdist-kvs.hh dnsdist-kvs.cc \
 	dnsdist-lbpolicies.cc dnsdist-lbpolicies.hh \
+	dnsdist-logging.cc dnsdist-logging.hh \
 	dnsdist-lua-actions.cc \
 	dnsdist-lua-bindings-cache.cc \
 	dnsdist-lua-bindings-dnscrypt.cc \
@@ -270,7 +273,6 @@ dnsdist_SOURCES = \
 	dnsparser.hh dnsparser.cc \
 	dnstap.cc dnstap.hh \
 	dnswriter.cc dnswriter.hh \
-	doh.hh \
 	doh3.cc doh3.hh \
 	dolog.cc dolog.hh \
 	doq-common.hh \
@@ -291,7 +293,7 @@ dnsdist_SOURCES = \
 	iputils.cc iputils.hh \
 	libssl.cc libssl.hh \
 	lock.hh \
-	logging.hh \
+	logging.cc logging.hh \
 	misc.cc misc.hh \
 	mplexer.hh \
 	namespaces.hh \
@@ -305,6 +307,7 @@ dnsdist_SOURCES = \
 	qtype.cc qtype.hh \
 	remote_logger.cc remote_logger.hh \
 	remote_logger_pool.cc remote_logger_pool.hh \
+	sanitizer.hh \
 	sholder.hh \
 	snmp-agent.cc snmp-agent.hh \
 	sstuff.hh \
@@ -352,6 +355,7 @@ testrunner_SOURCES = \
 	dnsdist-ipcrypt2.cc dnsdist-ipcrypt2.hh \
 	dnsdist-kvs.cc dnsdist-kvs.hh \
 	dnsdist-lbpolicies.cc dnsdist-lbpolicies.hh \
+	dnsdist-logging.cc dnsdist-logging.hh \
 	dnsdist-lua-bindings-dnsquestion.cc \
 	dnsdist-lua-bindings-kvs.cc \
 	dnsdist-lua-bindings.cc \
@@ -389,11 +393,14 @@ testrunner_SOURCES = \
 	ednsextendederror.cc ednsextendederror.hh \
 	ednsoptions.cc ednsoptions.hh \
 	ednssubnet.cc ednssubnet.hh \
+	ext/json11/json11.cpp \
+	ext/json11/json11.hpp \
 	ext/luawrapper/include/LuaContext.hpp \
 	generic-cache.hh \
 	generic-cache-interface.hh \
 	gettime.cc gettime.hh \
 	iputils.cc iputils.hh \
+	logging.cc logging.hh \
 	misc.cc misc.hh \
 	namespaces.hh \
 	noinitvector.hh \
@@ -467,7 +474,6 @@ dnsdist_LDADD = \
 	$(NET_SNMP_LIBS) \
 	$(LIBCAP_LIBS) \
 	$(IPCRYPT_LIBS) \
-	$(IPCRYPT2_LIBS) \
 	$(ARC4RANDOM_LIBS)
 
 testrunner_LDFLAGS = \
@@ -484,8 +490,8 @@ testrunner_LDADD = \
 	$(LIBSODIUM_LIBS) \
 	$(LUA_LIBS) \
 	$(RT_LIBS) \
+	$(SYSTEMD_LIBS) \
 	$(LIBCAP_LIBS) \
-	$(IPCRYPT2_LIBS) \
 	$(ARC4RANDOM_LIBS)
 
 if HAVE_CDB
@@ -525,6 +531,11 @@ testrunner_LDADD += $(LIBCRYPTO_LDFLAGS) $(LIBCRYPTO_LIBS)
 dnsdist_SOURCES += ipcipher.cc ipcipher.hh
 endif
 
+if HAVE_IPCRYPT2
+dnsdist_SOURCES += ext/ipcrypt2/ipcrypt2.c ext/ipcrypt2/include/ipcrypt2.h ext/ipcrypt2/softaes/untrinsics.h
+testrunner_SOURCES += ext/ipcrypt2/ipcrypt2.c ext/ipcrypt2/include/ipcrypt2.h ext/ipcrypt2/softaes/untrinsics.h
+endif
+
 if HAVE_LMDB
 dnsdist_LDADD += $(LMDB_LDFLAGS) $(LMDB_LIBS)
 testrunner_LDADD += $(LMDB_LDFLAGS) $(LMDB_LIBS)
@@ -542,11 +553,6 @@ if HAVE_DNS_OVER_HTTPS
 
 if HAVE_GNUTLS
 dnsdist_LDADD += $(GNUTLS_LIBS)
-endif
-
-if HAVE_LIBH2OEVLOOP
-dnsdist_SOURCES += doh.cc
-dnsdist_LDADD += $(LIBH2OEVLOOP_LIBS)
 endif
 
 if HAVE_NGHTTP2
@@ -633,6 +639,7 @@ fuzz_targets_libs = \
 	$(ARC4RANDOM_LIBS) \
 	$(LIBCRYPTO_LIBS) \
 	$(LIBSODIUM_LIBS) \
+	$(SYSTEMD_LIBS) \
 	$(LIB_FUZZING_ENGINE)
 
 fuzz_targets_ldflags = \
@@ -647,25 +654,33 @@ fuzz_targets_deps = standalone_fuzz_target_runner.o
 fuzz_target_dnsdistcache_SOURCES = \
 	channel.hh channel.cc \
 	dns.cc dns.hh \
+	dnscrypt.cc dnscrypt.hh \
 	dnsdist-cache.cc dnsdist-cache.hh \
 	dnsdist-configuration.cc dnsdist-configuration.hh \
 	dnsdist-crypto.cc dnsdist-crypto.hh \
 	dnsdist-dnsparser.cc dnsdist-dnsparser.hh \
 	dnsdist-dnsquestion.cc \
 	dnsdist-ecs.cc dnsdist-ecs.hh \
-	dnsdist-idstate.hh \
+	dnsdist-idstate.cc dnsdist-idstate.hh \
+	dnsdist-logging.cc dnsdist-logging.hh \
+	dnsdist-opentelemetry.cc dnsdist-opentelemetry.hh \
 	dnsdist-protocols.cc dnsdist-protocols.hh \
 	dnslabeltext.cc \
 	dnsname.cc dnsname.hh \
 	dnsparser.cc dnsparser.hh \
 	dnswriter.cc dnswriter.hh \
-	doh.hh \
+	dolog.cc dolog.hh \
 	ednsoptions.cc ednsoptions.hh \
 	ednssubnet.cc ednssubnet.hh \
+	ext/json11/json11.cpp \
+	ext/json11/json11.hpp \
 	fuzz_dnsdistcache.cc \
+	gettime.cc gettime.hh \
 	iputils.cc iputils.hh \
+	logging.cc logging.hh \
 	misc.cc misc.hh \
 	packetcache.hh \
+	protozero-trace.cc protozero-trace.hh \
 	qtype.cc qtype.hh \
 	svc-records.cc svc-records.hh
 
@@ -701,7 +716,7 @@ endif # if !HAVE_MANPAGES
 
 .venv: docs/requirements.txt
 	$(PYTHON) -m venv .venv
-	.venv/bin/pip install -U pip setuptools
+	.venv/bin/pip install -U pip "setuptools<82"
 	.venv/bin/pip install -r $<
 
 latex/dnsdist.pdf: docs/** .venv

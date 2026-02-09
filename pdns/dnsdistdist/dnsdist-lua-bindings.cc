@@ -21,6 +21,7 @@
  */
 #include "bpf-filter.hh"
 #include "config.h"
+#include "dnsdist-configuration.hh"
 #include "dnsdist.hh"
 #include "dnsdist-async.hh"
 #include "dnsdist-dynblocks.hh"
@@ -33,20 +34,25 @@
 
 #include "dolog.hh"
 #include "xsk.hh"
+#include <variant>
 
 void setupLuaBindingsLogging(LuaContext& luaCtx)
 {
   luaCtx.writeFunction("vinfolog", [](const string& arg) {
-    vinfolog("%s", arg);
+    VERBOSESLOG(infolog("%s", arg),
+                dnsdist::logging::getTopLogger("lua-message")->info(Logr::Info, arg));
   });
   luaCtx.writeFunction("infolog", [](const string& arg) {
-    infolog("%s", arg);
+    SLOG(infolog("%s", arg),
+         dnsdist::logging::getTopLogger("lua-message")->info(Logr::Info, arg));
   });
   luaCtx.writeFunction("errlog", [](const string& arg) {
-    errlog("%s", arg);
+    SLOG(errlog("%s", arg),
+         dnsdist::logging::getTopLogger("lua-message")->info(Logr::Error, arg));
   });
   luaCtx.writeFunction("warnlog", [](const string& arg) {
-    warnlog("%s", arg);
+    SLOG(warnlog("%s", arg),
+         dnsdist::logging::getTopLogger("lua-message")->info(Logr::Warning, arg));
   });
   luaCtx.writeFunction("show", [](const string& arg) {
     g_outputBuffer += arg;
@@ -487,6 +493,22 @@ void setupLuaBindings(LuaContext& luaCtx, bool client, bool configCheck)
   /* DNSName */
   luaCtx.registerFunction("isPartOf", &DNSName::isPartOf);
   luaCtx.registerFunction<bool (DNSName::*)()>("chopOff", [](DNSName& name) { return name.chopOff(); });
+  luaCtx.registerFunction<void (DNSName::*)(const std::variant<DNSName, std::string>&)>("append", [](DNSName& name, const std::variant<DNSName, std::string>& labels) {
+    if (std::holds_alternative<DNSName>(labels)) {
+      name += std::get<DNSName>(labels);
+    }
+    if (std::holds_alternative<string>(labels)) {
+      name += DNSName(std::get<std::string>(labels));
+    }
+  });
+  luaCtx.registerFunction<void (DNSName::*)(const std::variant<DNSName, std::string>&)>("prepend", [](DNSName& name, const std::variant<DNSName, std::string>& labels) {
+    if (std::holds_alternative<DNSName>(labels)) {
+      name = std::get<DNSName>(labels) + name;
+    }
+    if (std::holds_alternative<string>(labels)) {
+      name = DNSName(std::get<std::string>(labels)) + name;
+    }
+  });
   luaCtx.registerFunction<unsigned int (DNSName::*)() const>("countLabels", [](const DNSName& name) { return name.countLabels(); });
   luaCtx.registerFunction<size_t (DNSName::*)() const>("hash", [](const DNSName& name) { return name.hash(); });
   luaCtx.registerFunction<size_t (DNSName::*)() const>("wirelength", [](const DNSName& name) { return name.wirelength(); });
@@ -1091,7 +1113,8 @@ void setupLuaBindings(LuaContext& luaCtx, bool client, bool configCheck)
           callback(resolvedHostname, result);
         }
         catch (const std::exception& exp) {
-          vinfolog("Error during execution of getAddressInfo callback: %s", exp.what());
+          VERBOSESLOG(infolog("Error during execution of getAddressInfo callback: %s", exp.what()),
+                      dnsdist::logging::getTopLogger("getAddressInfo")->error(Logr::Error, exp.what(), "Error during execution of getAddressInfo callback"));
         }
         // this _needs_ to be done while we are holding the lock,
         // otherwise the destructor will corrupt the stack
@@ -1100,6 +1123,10 @@ void setupLuaBindings(LuaContext& luaCtx, bool client, bool configCheck)
       }
     });
     newThread.detach();
+  });
+
+  luaCtx.writeFunction("getServerID", []() -> std::string {
+    return dnsdist::configuration::getCurrentRuntimeConfiguration().d_server_id;
   });
 
   luaCtx.writeFunction("refreshRuntimeConfiguration", []() {

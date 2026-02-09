@@ -65,41 +65,47 @@ InternalQueryState InternalQueryState::partialCloneForXFR() const
 InternalQueryState::~InternalQueryState()
 {
 #ifndef DISABLE_PROTOBUF
-  if (delayedResponseMsgs.empty() && ottraceLoggers.empty()) {
-    return;
-  }
-
-  std::string OTData;
-  static thread_local string pbBuf;
-  pbBuf.clear();
-
-  if (tracingEnabled && d_OTTracer != nullptr) {
-    pdns::ProtoZero::Message msg{pbBuf};
-    OTData = d_OTTracer->getOTProtobuf();
-    msg.setOpenTelemetryData(OTData);
-  }
-
-  if (!delayedResponseMsgs.empty()) {
-    for (auto const& msg_logger : delayedResponseMsgs) {
-      // TODO: we should probably do something with the return value of queueData
-      if (!tracingEnabled) {
-        msg_logger.second->queueData(msg_logger.first);
-        continue;
-      }
-      // Protobuf wireformat allows us to simply append the second "message"
-      // that only contains the OTTrace data as a single bytes field
-      msg_logger.second->queueData(msg_logger.first + pbBuf);
+  try {
+    if (delayedResponseMsgs.empty() && ottraceLoggers.empty()) {
+      return;
     }
-  }
 
-  if (!ottraceLoggers.empty()) {
+    std::string OTData;
+    static thread_local string pbBuf;
     pbBuf.clear();
-    pdns::ProtoZero::Message minimalMsg{pbBuf};
-    minimalMsg.setType(pdns::ProtoZero::Message::MessageType::DNSQueryType);
-    minimalMsg.setOpenTelemetryData(OTData);
-    for (auto const& msg_logger : ottraceLoggers) {
-      msg_logger->queueData(pbBuf);
+
+    if (tracingEnabled && d_OTTracer != nullptr) {
+      pdns::ProtoZero::Message msg{pbBuf};
+      OTData = d_OTTracer->getOTProtobuf();
+      msg.setOpenTelemetryData(OTData);
     }
+
+    if (!delayedResponseMsgs.empty()) {
+      for (auto const& msg_logger : delayedResponseMsgs) {
+        // TODO: we should probably do something with the return value of queueData
+        if (!tracingEnabled) {
+          msg_logger.second->queueData(msg_logger.first);
+          continue;
+        }
+        // Protobuf wireformat allows us to simply append the second "message"
+        // that only contains the OTTrace data as a single bytes field
+        msg_logger.second->queueData(msg_logger.first + pbBuf);
+      }
+    }
+
+    if (!ottraceLoggers.empty()) {
+      pbBuf.clear();
+      pdns::ProtoZero::Message minimalMsg{pbBuf};
+      minimalMsg.setType(pdns::ProtoZero::Message::MessageType::DNSQueryType);
+      minimalMsg.setOpenTelemetryData(OTData);
+      for (auto const& msg_logger : ottraceLoggers) {
+        msg_logger->queueData(pbBuf);
+      }
+    }
+  }
+  catch (...) {
+    /* We don't want any uncaught exceptions in a dtor and
+       in theory the protozero code can throw */
   }
 #endif
 }
@@ -156,4 +162,13 @@ std::optional<pdns::trace::dnsdist::Tracer::Closer> InternalQueryState::getRules
   }
 #endif
   return ret;
+}
+
+std::shared_ptr<const Logr::Logger> InternalQueryState::getLogger(std::shared_ptr<const Logr::Logger> parent) const
+{
+  if (!parent) {
+    parent = dnsdist::logging::getTopLogger("query-processing");
+  }
+  auto logger = parent->withValues("dns.question.name", Logging::Loggable(this->qname), "dns.question.type", Logging::Loggable(this->qtype), "dns.question.class", Logging::Loggable(this->qclass), "source.address", Logging::Loggable(this->origRemote), "destination.address", Logging::Loggable(this->origDest), "proto", Logging::Loggable(this->protocol), "dns.question.id", Logging::Loggable(ntohs(this->origID)), "dns.question.flags", Logging::Loggable(this->origFlags));
+  return logger;
 }

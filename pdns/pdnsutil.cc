@@ -311,7 +311,7 @@ static const groupCommandDispatcher TSIGKEYCommands{
 static const groupCommandDispatcher viewsCommands{
   "Views",
   {{"list", {true, listView,
-    "",
+    "VIEW",
     "\tList all zones within VIEW"}},
    {"list-all", {true, listViews,
     "",
@@ -686,6 +686,7 @@ static void loadMainConfig(const std::string& configdir)
   ::arg().set("cache-ttl","Seconds to store packets in the PacketCache")="20";
   ::arg().set("negquery-cache-ttl","Seconds to store negative query results in the QueryCache")="60";
   ::arg().set("query-cache-ttl","Seconds to store query results in the QueryCache")="20";
+  ::arg().set("zone-cache-refresh-interval", "Seconds to cache list of known zones") = "300";
   ::arg().set("default-soa-content","Default SOA content")="a.misconfigured.dns.server.invalid hostmaster.@ 0 10800 3600 604800 3600";
   ::arg().set("chroot","Switch to this chroot jail")="";
   ::arg().set("dnssec-key-cache-ttl","Seconds to cache DNSSEC keys from the database")="30";
@@ -2644,12 +2645,18 @@ static int createZone(const ZoneName &zone, const DNSName& nsname) {
 
   di.backend->commitTransaction();
 
-  // Zone is not secured yet, suggest applying default-soa-edit rule to the
-  // serial number, if applicable.
-  if (sd.serial == 0) {
-    string edit_kind = ::arg()["default-soa-edit"];
-    if (!edit_kind.empty() && !pdns_iequals(edit_kind, "NONE")) {
-      cout << "Consider invoking 'pdnsutil zone increase-serial " << zone << "'" << endl;
+  if (!g_quiet) {
+    // Zone is not secured yet, suggest applying default-soa-edit rule to the
+    // serial number, if applicable.
+    if (sd.serial == 0) {
+      string edit_kind = ::arg()["default-soa-edit"];
+      if (!edit_kind.empty() && !pdns_iequals(edit_kind, "NONE")) {
+        cout << "Consider invoking 'pdnsutil zone increase-serial " << zone << "'" << endl;
+      }
+    }
+
+    if (::arg().asNum("zone-cache-refresh-interval") != 0) {
+      cout << "If the authoritative server is running, be sure to refresh its zone cache" << endl << "with 'pdns_control rediscover'" << endl;
     }
   }
 
@@ -2770,7 +2777,11 @@ static int addOrReplaceRecord(bool isAdd, const vector<string>& cmds)
   }
 
   std::vector<std::pair<DNSResourceRecord, string>> errors;
-  Check::checkRRSet(oldrrs, newrrs, zone, allowUnderscores, errors);
+  Check::RRSetFlags flags{Check::RRSET_CHECK_TTL};
+  if (allowUnderscores) {
+    flags = static_cast<Check::RRSetFlags>(flags | Check::RRSET_ALLOW_UNDERSCORES);
+  }
+  Check::checkRRSet(oldrrs, newrrs, zone, flags, errors);
   oldrrs.clear(); // no longer needed
   if (!errors.empty()) {
     for (const auto& error : errors) {

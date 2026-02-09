@@ -100,7 +100,7 @@ api-swagger.yaml: $(wildcard ${srcdir}/../docs/http-api/swagger/authoritative-ap
 if HAVE_VENV
 api-swagger.json: api-swagger.yaml requirements.txt
 	$(PYTHON) -m venv .venv
-	.venv/bin/pip install -U pip setuptools
+	.venv/bin/pip install -U pip "setuptools<82"
 	.venv/bin/pip install -r ${srcdir}/requirements.txt
 	.venv/bin/python ${srcdir}/convert-yaml-to-json.py $< $@
 else # if HAVE_VENV
@@ -263,6 +263,7 @@ pdns_server_SOURCES = \
 	resolver.cc resolver.hh \
 	responsestats.cc responsestats.hh responsestats-auth.cc \
 	rfc2136handler.cc \
+	sanitizer.hh \
 	secpoll-auth.cc secpoll-auth.hh \
 	secpoll.cc secpoll.hh \
 	serialtweaker.cc \
@@ -610,6 +611,7 @@ calidns_SOURCES = \
 	logger.cc \
 	misc.cc misc.hh \
 	nsecrecords.cc \
+	proxy-protocol.cc proxy-protocol.hh \
 	qtype.cc \
 	rcpgenerator.cc rcpgenerator.hh \
 	sillyrecords.cc \
