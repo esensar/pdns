@@ -8,7 +8,8 @@
 class ConnectionToBackend : public std::enable_shared_from_this<ConnectionToBackend>
 {
 public:
-  ConnectionToBackend(const std::shared_ptr<DownstreamState>& ds, std::unique_ptr<FDMultiplexer>& mplexer, const struct timeval& now): d_connectionStartTime(now), d_lastDataReceivedTime(now), d_ds(ds), d_mplexer(mplexer), d_enableFastOpen(ds->d_config.tcpFastOpen)
+  ConnectionToBackend(const std::shared_ptr<DownstreamState>& ds, std::unique_ptr<FDMultiplexer>& mplexer, const struct timeval& now) :
+    d_connectionStartTime(now), d_lastDataReceivedTime(now), d_ds(ds), d_mplexer(mplexer), d_enableFastOpen(ds->d_config.tcpFastOpen)
   {
     reconnect();
   }
@@ -142,6 +143,8 @@ public:
 
   virtual std::string toString() const = 0;
 
+  virtual std::shared_ptr<const Logr::Logger> getLogger() const;
+
 protected:
   bool reconnect();
 
@@ -226,7 +229,8 @@ protected:
 class TCPConnectionToBackend : public ConnectionToBackend
 {
 public:
-  TCPConnectionToBackend(const std::shared_ptr<DownstreamState>& ds, std::unique_ptr<FDMultiplexer>& mplexer, const struct timeval& now, std::string&& /* proxyProtocolPayload*, unused but there to match the HTTP2 connections, so we can use the same templated connections manager class */): ConnectionToBackend(ds, mplexer, now), d_responseBuffer(512)
+  TCPConnectionToBackend(const std::shared_ptr<DownstreamState>& ds, std::unique_ptr<FDMultiplexer>& mplexer, const struct timeval& now, std::string&& /* proxyProtocolPayload*, unused but there to match the HTTP2 connections, so we can use the same templated connections manager class */) :
+    ConnectionToBackend(ds, mplexer, now), d_responseBuffer(512)
   {
   }
 
@@ -261,17 +265,29 @@ public:
   std::string toString() const override
   {
     ostringstream o;
-    o << "TCP connection to backend "<<(d_ds ? d_ds->getName() : "empty")<<" over FD "<<(d_handler ? std::to_string(d_handler->getDescriptor()) : "no socket")<<", state is "<<(int)d_state<<", io state is "<<(d_ioState ? d_ioState->getState() : "empty")<<", queries count is "<<d_queries<<", pending queries count is "<<d_pendingQueries.size()<<", "<<d_pendingResponses.size()<<" pending responses";
+    o << "TCP connection to backend " << (d_ds ? d_ds->getName() : "empty") << " over FD " << (d_handler ? std::to_string(d_handler->getDescriptor()) : "no socket") << ", state is " << (int)d_state << ", io state is " << (d_ioState ? d_ioState->getState() : "empty") << ", queries count is " << d_queries << ", pending queries count is " << d_pendingQueries.size() << ", " << d_pendingResponses.size() << " pending responses";
     return o.str();
   }
 
   void setProxyProtocolValuesSent(std::unique_ptr<std::vector<ProxyProtocolValue>>&& proxyProtocolValuesSent);
 
+  std::shared_ptr<const Logr::Logger> getLogger() const override;
+
 private:
   /* waitingForResponseFromBackend is a state where we have not yet started reading the size,
      so we can still switch to sending instead */
-  enum class State : uint8_t { idle, sendingQueryToBackend, waitingForResponseFromBackend, readingResponseSizeFromBackend, readingResponseFromBackend };
-  enum class FailureReason : uint8_t { /* too many attempts */ gaveUp, timeout, unexpectedQueryID };
+  enum class State : uint8_t
+  {
+    idle,
+    sendingQueryToBackend,
+    waitingForResponseFromBackend,
+    readingResponseSizeFromBackend,
+    readingResponseFromBackend
+  };
+  enum class FailureReason : uint8_t
+  { /* too many attempts */ gaveUp,
+    timeout,
+    unexpectedQueryID };
 
   static void handleIO(std::shared_ptr<TCPConnectionToBackend>& conn, const struct timeval& now);
   static void handleIOCallback(int fd, FDMultiplexer::funcparam_t& param);

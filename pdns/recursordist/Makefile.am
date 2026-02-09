@@ -214,6 +214,7 @@ pdns_recursor_SOURCES = \
 	root-addresses.hh \
 	root-dnssec.hh \
 	rpzloader.cc rpzloader.hh \
+	sanitizer.hh \
 	secpoll-recursor.cc secpoll-recursor.hh \
 	secpoll.cc secpoll.hh \
 	sha.hh \
@@ -589,7 +590,7 @@ endif # if !HAVE_MANPAGES
 
 .venv: docs/requirements.txt
 	$(PYTHON) -m venv .venv
-	.venv/bin/pip install -U pip setuptools
+	.venv/bin/pip install -U pip "setuptools<82"
 	.venv/bin/pip install -r ${top_srcdir}/docs/requirements.txt
 
 html-docs: docs/** .venv

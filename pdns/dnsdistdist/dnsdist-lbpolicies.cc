@@ -28,8 +28,10 @@
 #include "dns_random.hh"
 
 static constexpr size_t s_staticArrayCutOff = 16;
-template <typename T> using DynamicIndexArray = std::vector<std::pair<T, size_t>>;
-template <typename T> using StaticIndexArray = std::array<std::pair<T, size_t>, s_staticArrayCutOff>;
+template <typename T>
+using DynamicIndexArray = std::vector<std::pair<T, size_t>>;
+template <typename T>
+using StaticIndexArray = std::array<std::pair<T, size_t>, s_staticArrayCutOff>;
 
 static std::optional<ServerPolicy::SelectedServerPosition> getLeastOutstanding(const ServerPolicy::NumberedServerVector& servers)
 {
@@ -90,19 +92,21 @@ std::optional<ServerPolicy::SelectedServerPosition> firstAvailable(const ServerP
   return leastOutstanding(servers, dnsQuestion);
 }
 
-template <class T> static std::optional<ServerPolicy::SelectedServerPosition> getValRandom(const ServerPolicy::NumberedServerVector& servers, T& poss, const unsigned int val, const double targetLoad)
+template <class T>
+static std::optional<ServerPolicy::SelectedServerPosition> getValRandom(const ServerPolicy::NumberedServerVector& servers, T& poss, const unsigned int val, const double targetLoad)
 {
   constexpr int max = std::numeric_limits<int>::max();
   int sum = 0;
 
   size_t usableServers = 0;
   const auto weightedBalancingFactor = dnsdist::configuration::getImmutableConfiguration().d_weightedBalancingFactor;
-  for (const auto& server : servers) {      // w=1, w=10 -> 1, 11
+  for (const auto& server : servers) { // w=1, w=10 -> 1, 11
     if (server.second->isUp() && (weightedBalancingFactor == 0 || (static_cast<double>(server.second->outstanding.load()) <= (targetLoad * server.second->d_config.d_weight)))) {
       // Don't overflow sum when adding high weights
       if (server.second->d_config.d_weight > max - sum) {
         sum = max;
-      } else {
+      }
+      else {
         sum += server.second->d_config.d_weight;
       }
 
@@ -117,7 +121,7 @@ template <class T> static std::optional<ServerPolicy::SelectedServerPosition> ge
   }
 
   int randomVal = static_cast<int>(val % sum);
-  auto selected = std::upper_bound(poss.begin(), poss.begin() + usableServers, randomVal, [](int randomVal_, const typename T::value_type& serverPair) { return  randomVal_ < serverPair.first;});
+  auto selected = std::upper_bound(poss.begin(), poss.begin() + usableServers, randomVal, [](int randomVal_, const typename T::value_type& serverPair) { return randomVal_ < serverPair.first; });
   if (selected == poss.begin() + usableServers) {
     return std::nullopt;
   }
@@ -197,7 +201,7 @@ std::optional<ServerPolicy::SelectedServerPosition> chashedFromHash(const Server
     }
   }
 
-  for (const auto& serverPair: servers) {
+  for (const auto& serverPair : servers) {
     if (serverPair.second->isUp() && (consistentHashBalancingFactor == 0 || static_cast<double>(serverPair.second->outstanding.load()) <= (targetLoad * serverPair.second->d_config.d_weight))) {
       // make sure hashes have been computed
       if (!serverPair.second->hashesComputed) {
@@ -326,7 +330,8 @@ const ServerPool& createPoolIfNotExists(const string& poolName)
   }
 
   if (!poolName.empty()) {
-    vinfolog("Creating pool %s", poolName);
+    VERBOSESLOG(infolog("Creating pool %s", poolName),
+                dnsdist::logging::getTopLogger("pool")->info(Logr::Info, "Creating a new pool of backends", "pool", Logging::Loggable(poolName)));
   }
 
   dnsdist::configuration::updateRuntimeConfiguration([&poolName](dnsdist::configuration::RuntimeConfiguration& config) {
@@ -343,9 +348,12 @@ const ServerPool& createPoolIfNotExists(const string& poolName)
 void setPoolPolicy(const string& poolName, std::shared_ptr<ServerPolicy> policy)
 {
   if (!poolName.empty()) {
-    vinfolog("Setting pool %s server selection policy to %s", poolName, policy->getName());
-  } else {
-    vinfolog("Setting default pool server selection policy to %s", policy->getName());
+    VERBOSESLOG(infolog("Setting pool %s server selection policy to %s", poolName, policy->getName()),
+                dnsdist::logging::getTopLogger("pool")->info(Logr::Info, "Setting pool server selection policy", "pool", Logging::Loggable(poolName), "policy", Logging::Loggable(policy->getName())));
+  }
+  else {
+    VERBOSESLOG(infolog("Setting default pool server selection policy to %s", policy->getName()),
+                dnsdist::logging::getTopLogger("pool")->info(Logr::Info, "Setting pool server selection policy", "pool", Logging::Loggable(poolName), "policy", Logging::Loggable(policy->getName())));
   }
 
   dnsdist::configuration::updateRuntimeConfiguration([&poolName, &policy](dnsdist::configuration::RuntimeConfiguration& config) {
@@ -357,9 +365,12 @@ void setPoolPolicy(const string& poolName, std::shared_ptr<ServerPolicy> policy)
 void addServerToPool(const string& poolName, std::shared_ptr<DownstreamState> server)
 {
   if (!poolName.empty()) {
-    vinfolog("Adding server to pool %s", poolName);
-  } else {
-    vinfolog("Adding server to default pool");
+    VERBOSESLOG(infolog("Adding server to pool %s", poolName),
+                dnsdist::logging::getTopLogger("pool")->info(Logr::Info, "Adding server to pool", "pool", Logging::Loggable(poolName)));
+  }
+  else {
+    VERBOSESLOG(infolog("Adding server to default pool"),
+                dnsdist::logging::getTopLogger("pool")->info(Logr::Info, "Adding server to pool", "pool", Logging::Loggable(poolName)));
   }
 
   dnsdist::configuration::updateRuntimeConfiguration([&poolName, &server](dnsdist::configuration::RuntimeConfiguration& config) {
@@ -371,10 +382,12 @@ void addServerToPool(const string& poolName, std::shared_ptr<DownstreamState> se
 void removeServerFromPool(const string& poolName, std::shared_ptr<DownstreamState> server)
 {
   if (!poolName.empty()) {
-    vinfolog("Removing server from pool %s", poolName);
+    VERBOSESLOG(infolog("Removing server from pool %s", poolName),
+                dnsdist::logging::getTopLogger("pool")->info(Logr::Info, "Removing server from pool", "pool", Logging::Loggable(poolName)));
   }
   else {
-    vinfolog("Removing server from default pool");
+    VERBOSESLOG(infolog("Removing server from default pool"),
+                dnsdist::logging::getTopLogger("pool")->info(Logr::Info, "Removing server from pool", "pool", Logging::Loggable(poolName)));
   }
 
   dnsdist::configuration::updateRuntimeConfiguration([&poolName, &server](dnsdist::configuration::RuntimeConfiguration& config) {
@@ -394,7 +407,8 @@ const ServerPool& getPool(const std::string& poolName)
   return poolIt->second;
 }
 
-ServerPolicy::ServerPolicy(const std::string& name_, const std::string& code): d_name(name_), d_perThreadPolicyCode(code), d_isLua(true), d_isFFI(true), d_isPerThread(true)
+ServerPolicy::ServerPolicy(const std::string& name_, const std::string& code) :
+  d_name(name_), d_perThreadPolicyCode(code), d_isLua(true), d_isFFI(true), d_isPerThread(true)
 {
   LuaContext tmpContext;
   setupLuaLoadBalancingContext(tmpContext);

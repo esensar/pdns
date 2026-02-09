@@ -45,8 +45,6 @@
 #include "nod.hh"
 #endif /* NOD_ENABLED */
 
-#include <boost/container/flat_set.hpp>
-
 extern std::shared_ptr<Logr::Logger> g_slogtcpin;
 extern std::shared_ptr<Logr::Logger> g_slogudpin;
 
@@ -240,6 +238,7 @@ extern LockGuarded<std::shared_ptr<SyncRes::domainmap_t>> g_initialDomainMap; //
 extern LockGuarded<std::shared_ptr<NetmaskGroup>> g_initialAllowFrom; // new thread needs to be setup with this
 extern LockGuarded<std::shared_ptr<NetmaskGroup>> g_initialAllowNotifyFrom; // new threads need this to be setup
 extern LockGuarded<std::shared_ptr<notifyset_t>> g_initialAllowNotifyFor; // new threads need this to be setup
+extern LockGuarded<std::shared_ptr<OpenTelemetryTraceConditions>> g_initialOpenTelemetryConditions; // new threads need this to be set
 extern thread_local std::shared_ptr<Regex> t_traceRegex;
 extern thread_local FDWrapper t_tracefd;
 extern string g_programname;
@@ -286,7 +285,7 @@ extern thread_local FrameStreamServersInfo t_frameStreamServersInfo;
 extern thread_local FrameStreamServersInfo t_nodFrameStreamServersInfo;
 #endif /* HAVE_FSTRM */
 
-extern boost::container::flat_set<uint16_t> g_avoidUdpSourcePorts;
+extern std::vector<bool> g_avoidUdpSourcePorts;
 
 /* without reuseport, all listeners share the same sockets */
 typedef vector<pair<int, std::function<void(int, boost::any&)>>> deferredAdd_t;

@@ -27,7 +27,7 @@
 
 namespace dnsdist::webserver
 {
-void registerWebHandler(const std::string& endpoint, std::function<void(const YaHTTP::Request&, YaHTTP::Response&)> handler, bool isLua);
+void registerWebHandler(const std::string& endpoint, std::function<void(const YaHTTP::Request&, YaHTTP::Response&)> handler);
 }
 
 void setupLuaWeb([[maybe_unused]] LuaContext& luaCtx)
@@ -35,7 +35,7 @@ void setupLuaWeb([[maybe_unused]] LuaContext& luaCtx)
 #ifndef DISABLE_LUA_WEB_HANDLERS
   luaCtx.writeFunction("registerWebHandler", [](const std::string& path, std::function<void(const YaHTTP::Request*, YaHTTP::Response*)> handler) {
     /* LuaWrapper does a copy for objects passed by reference, so we pass a pointer */
-    dnsdist::webserver::registerWebHandler(path, [handler](const YaHTTP::Request& req, YaHTTP::Response& resp) { handler(&req, &resp); }, true);
+    dnsdist::webserver::registerWebHandler(path, [handler](const YaHTTP::Request& req, YaHTTP::Response& resp) { handler(&req, &resp); });
   });
 
   luaCtx.registerMember<std::string(YaHTTP::Request::*)>("path", [](const YaHTTP::Request& req) -> std::string { return req.url.path; }, [](YaHTTP::Request& req, const std::string& path) { (void)req; (void) path; });
@@ -47,22 +47,19 @@ void setupLuaWeb([[maybe_unused]] LuaContext& luaCtx)
     for (const auto& entry : req.getvars) {
       values.insert({entry.first, entry.second});
     }
-    return values;
-  }, [](YaHTTP::Request& req, const LuaAssociativeTable<std::string>& values) { (void)req; (void)values; });
+    return values; }, [](YaHTTP::Request& req, const LuaAssociativeTable<std::string>& values) { (void)req; (void)values; });
   luaCtx.registerMember<LuaAssociativeTable<std::string>(YaHTTP::Request::*)>("postvars", [](const YaHTTP::Request& req) {
     LuaAssociativeTable<std::string> values;
     for (const auto& entry : req.postvars) {
       values.insert({entry.first, entry.second});
     }
-    return values;
-  }, [](YaHTTP::Request& req, const LuaAssociativeTable<std::string>& values) { (void)req; (void)values; });
+    return values; }, [](YaHTTP::Request& req, const LuaAssociativeTable<std::string>& values) { (void)req; (void)values; });
   luaCtx.registerMember<LuaAssociativeTable<std::string>(YaHTTP::Request::*)>("headers", [](const YaHTTP::Request& req) {
     LuaAssociativeTable<std::string> values;
     for (const auto& entry : req.headers) {
       values.insert({entry.first, entry.second});
     }
-    return values;
-  }, [](YaHTTP::Request& req, const LuaAssociativeTable<std::string>& values) { (void)req; (void)values; });
+    return values; }, [](YaHTTP::Request& req, const LuaAssociativeTable<std::string>& values) { (void)req; (void)values; });
 
   /* Response */
   luaCtx.registerMember<std::string(YaHTTP::Response::*)>("body", [](const YaHTTP::Response& resp) -> const std::string { return resp.body; }, [](YaHTTP::Response& resp, const std::string& body) { resp.body = body; });
@@ -72,12 +69,10 @@ void setupLuaWeb([[maybe_unused]] LuaContext& luaCtx)
     for (const auto& entry : resp.headers) {
       values.insert({entry.first, entry.second});
     }
-    return values;
-  }, [](YaHTTP::Response& resp, const LuaAssociativeTable<std::string>& values) {
+    return values; }, [](YaHTTP::Response& resp, const LuaAssociativeTable<std::string>& values) {
     resp.headers.clear();
     for (const auto& entry : values) {
       resp.headers.insert({entry.first, entry.second});
-    }
-  });
+    } });
 #endif /* DISABLE_LUA_WEB_HANDLERS */
 }

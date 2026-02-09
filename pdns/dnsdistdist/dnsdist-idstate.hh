@@ -35,6 +35,7 @@
 #include "dnsdist-configuration.hh"
 #include "dnsdist-edns.hh"
 #include "dnsname.hh"
+#include "dnsdist-logging.hh"
 #include "dnsdist-protocols.hh"
 #include "ednsextendederror.hh"
 #include "gettime.hh"
@@ -177,6 +178,8 @@ struct InternalQueryState
 
   InternalQueryState partialCloneForXFR() const;
 
+  std::shared_ptr<const Logr::Logger> getLogger(std::shared_ptr<const Logr::Logger> parent = nullptr) const;
+
   std::optional<Netmask> subnet{std::nullopt}; // 40
   std::string poolName; // 32
 #if !defined(DISABLE_PROTOBUF)
@@ -296,7 +299,7 @@ struct IDState
        the 'outstanding' counters, which should only be increased when we are picking
        an empty state, and not when reusing ;
        For DoH, though, we have dynamically allocated a DOHUnit object that needs to
-       be freed, as well as internal objects internals to libh2o.
+       be freed, as well as internal objects.
      - one of the UDP receiver threads receiving a response from a backend, picking
        the corresponding state and sending the response to the client ;
      - the 'healthcheck' thread scanning the states to actively discover timeouts,

@@ -275,9 +275,38 @@ class AuthZones(ZonesApiTestCase, AuthZonesHelperMixin):
         self.assertEqual(data['catalog'], "default-catalog.example.com.")
 
     def test_create_zone_default_soa_edit_api(self):
+        """Test that zones created without soa_edit_api get the configured default-soa-edit-api value."""
         name, payload, data = self.create_zone()
         print(data)
-        self.assertEqual(data['soa_edit_api'], 'DEFAULT')
+        # default-soa-edit-api is set to EPOCH in the test config
+        self.assertEqual(data['soa_edit_api'], 'EPOCH')
+
+    def test_create_zone_override_soa_edit_api(self):
+        """Test that explicitly setting soa_edit_api overrides the default."""
+        name, payload, data = self.create_zone(soa_edit_api='SOA-EDIT-INCREASE')
+        print(data)
+        self.assertEqual(data['soa_edit_api'], 'SOA-EDIT-INCREASE')
+
+    def test_create_zone_empty_soa_edit_api(self):
+        """Test that explicitly setting soa_edit_api to empty does not use default."""
+        name, payload, data = self.create_zone(soa_edit_api='')
+        print(data)
+        self.assertEqual(data['soa_edit_api'], '')
+
+    def test_update_zone_does_not_override_soa_edit_api(self):
+        """Test that updating a zone does not change existing soa_edit_api to default."""
+        # Create zone with empty soa_edit_api
+        name, payload, data = self.create_zone(soa_edit_api='')
+        self.assertEqual(data['soa_edit_api'], '')
+        # Update zone without specifying soa_edit_api - it should remain empty
+        update_payload = {
+            'kind': 'Master',
+            'masters': ['192.0.2.1']
+        }
+        self.put_zone(name, update_payload)
+        data = self.get_zone(name)
+        # Verify soa_edit_api was NOT changed to the default value
+        self.assertEqual(data['soa_edit_api'], '')
 
     def test_create_zone_exists(self):
         name, payload, data = self.create_zone()
@@ -693,7 +722,8 @@ class AuthZones(ZonesApiTestCase, AuthZonesHelperMixin):
         Create a zone, then set and unset "dnssec", then check if the serial was increased
         after every step
         """
-        name, payload, data = self.create_zone()
+        # Use soa_edit_api='DEFAULT' to get predictable INCEPTION-INCREMENT serials
+        name, payload, data = self.create_zone(soa_edit_api='DEFAULT')
 
         soa_serial = get_first_rec(data, name, 'SOA')['content'].split(' ')[2]
         self.assertEqual(soa_serial[-2:], '01')
@@ -1677,6 +1707,48 @@ $NAME$  1D  IN  SOA ns1.example.org. hostmaster.example.org. (
         data2 = self.get_zone(name)
         self.assertEqual(get_rrset(data, 'a.'+name), get_rrset(data2, 'a.'+name))
 
+    def test_zone_rr_bogus_extend(self):
+        name, payload, zone = self.create_zone()
+        # add a single record with extend
+        rrset = {
+            'changetype': 'extend',
+            'name': 'txt.'+name,
+            'type': 'TXT',
+            'ttl': 3600,
+            'records': [
+                {
+                    "content": "\"hello\"",
+                    "disabled": False
+                }
+            ]
+        }
+        payload = {'rrsets': [rrset]}
+        r = self.session.patch(
+            self.url("/api/v1/servers/localhost/zones/" + name),
+            data=json.dumps(payload),
+            headers={'content-type': 'application/json'})
+        self.assert_success(r)
+        # try and add another record with a mismatching ttl
+        rrset2 = {
+            'changetype': 'extend',
+            'name': 'txt.'+name,
+            'type': 'TXT',
+            'ttl': 1234,
+            'records': [
+                {
+                    "content": "\"hello again\"",
+                    "disabled": False
+                }
+            ]
+        }
+        payload2 = {'rrsets': [rrset2]}
+        r = self.session.patch(
+            self.url("/api/v1/servers/localhost/zones/" + name),
+            data=json.dumps(payload2),
+            headers={'content-type': 'application/json'})
+        self.assertEqual(r.status_code, 422)
+        self.assert_in_json_error('uses a different TTL value than the remainder of the RRset', r.json())
+
     def test_zone_rr_update_with_prune(self):
         name, payload, zone = self.create_zone()
         # fill a bunch of records
@@ -1718,8 +1790,8 @@ $NAME$  1D  IN  SOA ns1.example.org. hostmaster.example.org. (
         # note that we can't assume anything about the order of the records
         records = get_rrset(data1, 'a.' + name, 'A')['records']
         self.assertEqual(len(records), 2)
-        self.assertTrue(a1 in records)
-        self.assertTrue(a3 in records)
+        self.assertIn(a1, records)
+        self.assertIn(a3, records)
         # get_rrset above has removed the timestamps from data1, fetch the
         # zone again, since we want to ensure the following operations do
         # not change anything.
@@ -1817,9 +1889,9 @@ $NAME$  1D  IN  SOA ns1.example.org. hostmaster.example.org. (
         # note that we can't assume anything about the order of the records
         records = get_rrset(data, 'a.' + name, 'A')['records']
         self.assertEqual(len(records), 3)
-        self.assertTrue(a1 in records)
-        self.assertTrue(a2 in records)
-        self.assertTrue(a4 in records)
+        self.assertIn(a1, records)
+        self.assertIn(a2, records)
+        self.assertIn(a4, records)
 
     def test_zone_disable_reenable(self):
         # This also tests that SOA-EDIT-API works.

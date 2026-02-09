@@ -21,7 +21,9 @@
  */
 #pragma once
 
+#include <memory>
 #include "dnsdist.hh"
+#include "logr.hh"
 
 class KeyValueLookupKey
 {
@@ -33,10 +35,11 @@ public:
   virtual std::string toString() const = 0;
 };
 
-class KeyValueLookupKeySourceIP: public KeyValueLookupKey
+class KeyValueLookupKeySourceIP : public KeyValueLookupKey
 {
 public:
-  KeyValueLookupKeySourceIP(uint8_t v4Mask, uint8_t v6Mask, bool includePort): d_v4Mask(v4Mask), d_v6Mask(v6Mask), d_includePort(includePort)
+  KeyValueLookupKeySourceIP(uint8_t v4Mask, uint8_t v6Mask, bool includePort) :
+    d_v4Mask(v4Mask), d_v6Mask(v6Mask), d_includePort(includePort)
   {
   }
 
@@ -51,17 +54,18 @@ public:
   {
     return "source IP (masked to " + std::to_string(d_v4Mask) + " (v4) / " + std::to_string(d_v6Mask) + " (v6) bits)" + (d_includePort ? " including the port" : "");
   }
+
 private:
   uint8_t d_v4Mask;
   uint8_t d_v6Mask;
   bool d_includePort;
 };
 
-class KeyValueLookupKeyQName: public KeyValueLookupKey
+class KeyValueLookupKeyQName : public KeyValueLookupKey
 {
 public:
-
-  KeyValueLookupKeyQName(bool wireFormat): d_wireFormat(wireFormat)
+  KeyValueLookupKeyQName(bool wireFormat) :
+    d_wireFormat(wireFormat)
   {
   }
 
@@ -90,10 +94,11 @@ private:
   bool d_wireFormat;
 };
 
-class KeyValueLookupKeySuffix: public KeyValueLookupKey
+class KeyValueLookupKeySuffix : public KeyValueLookupKey
 {
 public:
-  KeyValueLookupKeySuffix(size_t minLabels, bool wireFormat): d_minLabels(minLabels), d_wireFormat(wireFormat)
+  KeyValueLookupKeySuffix(size_t minLabels, bool wireFormat) :
+    d_minLabels(minLabels), d_wireFormat(wireFormat)
   {
   }
 
@@ -117,10 +122,11 @@ private:
   bool d_wireFormat;
 };
 
-class KeyValueLookupKeyTag: public KeyValueLookupKey
+class KeyValueLookupKeyTag : public KeyValueLookupKey
 {
 public:
-  KeyValueLookupKeyTag(const std::string& tag): d_tag(tag)
+  KeyValueLookupKeyTag(const std::string& tag) :
+    d_tag(tag)
   {
   }
 
@@ -129,7 +135,7 @@ public:
     if (dq.ids.qTag) {
       const auto& it = dq.ids.qTag->find(d_tag);
       if (it != dq.ids.qTag->end()) {
-        return { it->second };
+        return {it->second};
       }
     }
     return {};
@@ -174,10 +180,11 @@ public:
 
 #include "ext/lmdb-safe/lmdb-safe.hh"
 
-class LMDBKVStore: public KeyValueStore
+class LMDBKVStore : public KeyValueStore
 {
 public:
-  LMDBKVStore(const std::string& fname, const std::string& dbName, bool noLock=false): d_env(getMDBEnv(fname.c_str(), noLock ? MDB_NOSUBDIR|MDB_RDONLY|MDB_NOLOCK : MDB_NOSUBDIR|MDB_RDONLY, 0600, 0)), d_dbi(d_env->openDB(dbName, 0)), d_fname(fname), d_dbName(dbName)
+  LMDBKVStore(const std::string& fname, const std::string& dbName, bool noLock = false) :
+    d_env(getMDBEnv(fname.c_str(), noLock ? MDB_NOSUBDIR | MDB_RDONLY | MDB_NOLOCK : MDB_NOSUBDIR | MDB_RDONLY, 0600, 0)), d_dbi(d_env->openDB(dbName, 0)), d_fname(fname), d_dbName(dbName)
   {
   }
 
@@ -186,6 +193,8 @@ public:
   bool getRangeValue(const std::string& key, std::string& value) override;
 
 private:
+  std::shared_ptr<const Logr::Logger> getLogger() const;
+
   std::shared_ptr<MDBEnv> d_env;
   MDBDbi d_dbi;
   std::string d_fname;
@@ -198,7 +207,7 @@ private:
 
 #include "cdb.hh"
 
-class CDBKVStore: public KeyValueStore
+class CDBKVStore : public KeyValueStore
 {
 public:
   CDBKVStore(const std::string& fname, time_t refreshDelay);
@@ -209,6 +218,7 @@ public:
   bool reload() override;
 
 private:
+  std::shared_ptr<const Logr::Logger> getLogger() const;
   void refreshDBIfNeeded(time_t now);
   bool reload(const struct stat& st);
 
