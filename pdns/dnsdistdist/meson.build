@@ -604,6 +604,7 @@ if get_option('unit-tests')
         dep_boost_test,
         dep_ffi_interface,
         dep_lua,
+        dep_probds,
         dep_protozero,
         dep_yahttp,
         dep_libsystemd, # because of the journal logging backend
@@ -613,6 +614,7 @@ if get_option('unit-tests')
 endif
 
 benchmark_sources = files(
+  src_dir / 'bench-cuckoo-filter_cc.cc',
   src_dir / 'bench-dnsdist-action-rcode.cc',
   src_dir / 'bench-dnsdist-dnsparser_cc.cc',
   src_dir / 'bench-dnsdist-opentelemetry_cc.cc',
@@ -640,7 +642,10 @@ if get_option('benchmark')
         dep_dnstap,
         dep_ffi_interface,
         dep_lua,
+        dep_probds,
         dep_protozero,
+        dep_yahttp,
+        dep_libsystemd, # because of the journal logging backend
       ],
     },
   }
