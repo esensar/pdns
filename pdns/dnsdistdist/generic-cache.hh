@@ -77,7 +77,7 @@ public:
   {
     d_stats.d_memoryUsed = sizeof(*this) + d_shards.size() * sizeof(CacheShard);
   }
-  virtual ~GenericCache() {};
+  virtual ~GenericCache(){};
 
   void insert(const K& key, V value) override
   {
@@ -415,7 +415,7 @@ public:
     d_stats.d_memoryUsed += sizeof(*this);
   }
 
-  virtual ~BloomFilter() {};
+  virtual ~BloomFilter(){};
 
   void insertKey(const std::string& key) override
   {
@@ -492,7 +492,7 @@ public:
 
     struct SlotFieldDescription
     {
-      SlotFieldDescription() {};
+      SlotFieldDescription(){};
       SlotFieldDescription(size_t startBit, size_t endBit)
       {
         assert(endBit - startBit <= 32);
@@ -534,12 +534,14 @@ public:
       d_settings.d_ttlBits = 32;
     }
 
-    d_fingerprintMask = (1L << d_settings.d_fingerprintBits) - 1;
+    d_settings.d_fingerprintSlot = CuckooSettings::SlotFieldDescription(0, d_settings.d_fingerprintBits);
     d_settings.d_dataBlockBits = d_settings.d_fingerprintBits;
     if (d_settings.d_lruEnabled) {
+      d_settings.d_lruSlot = CuckooSettings::SlotFieldDescription(d_settings.d_dataBlockBits, d_settings.d_dataBlockBits + 8);
       d_settings.d_dataBlockBits += 8;
     }
     if (d_settings.d_ttlEnabled) {
+      d_settings.d_ttlSlot = CuckooSettings::SlotFieldDescription(d_settings.d_dataBlockBits, d_settings.d_dataBlockBits + d_settings.d_ttlBits);
       d_settings.d_dataBlockBits += d_settings.d_ttlBits;
     }
     d_settings.d_dataBlockSize = (d_settings.d_dataBlockBits + 7) / 8;
@@ -554,7 +556,7 @@ public:
     d_stats.d_memoryUsed += sizeof(*this) + std::transform_reduce(d_buckets.begin(), d_buckets.end(), 0, std::plus<>(), [](LockGuarded<Bucket>& bucket) { return sizeof(Bucket) + bucket.lock()->d_data.size(); });
   }
 
-  virtual ~CuckooFilter() {};
+  virtual ~CuckooFilter(){};
 
   void insertKey(const std::string& key) override
   {
@@ -651,7 +653,7 @@ public:
 
   size_t purgeExpired([[maybe_unused]] size_t upTo, time_t now) override
   {
-    if (!d_settings.d_ttlEnabled) {
+    if (!d_settings.d_ttlEnabled && !d_settings.d_lruEnabled) {
       return 0;
     }
 
@@ -713,7 +715,7 @@ private:
     {
       uint64_t loaded = 0;
       for (size_t i = 0; i < slot.len; ++i) {
-        loaded += ((uint64_t)d_dataStart + slot.startByte + i) << ((slot.len - (i + 1)) * 8);
+        loaded += *(d_dataStart + slot.startByte + i) << ((slot.len - (i + 1)) * 8);
       };
       return (loaded & slot.mask) >> slot.shift;
     };
@@ -723,7 +725,7 @@ private:
       uint32_t maskedValue = value & slot.valueMask;
       uint64_t loaded = 0;
       for (size_t i = 0; i < slot.len; ++i) {
-        loaded += ((uint64_t)d_dataStart + slot.startByte + i) << ((slot.len - (i + 1)) * 8);
+        loaded += *(d_dataStart + slot.startByte + i) << ((slot.len - (i + 1)) * 8);
       };
       auto maskedLoaded = loaded & !slot.mask;
       auto final = maskedLoaded | (maskedValue << slot.shift);
@@ -960,7 +962,7 @@ private:
   {
     uint32_t fingerprint_raw = murmurHash(data);
 
-    Fingerprint fp = static_cast<Fingerprint>((fingerprint_raw & d_fingerprintMask));
+    Fingerprint fp = static_cast<Fingerprint>((fingerprint_raw & d_settings.d_fingerprintSlot.valueMask));
     if (fp == EMPTY_FINGERPRINT)
       fp = 1; // Avoid empty fingerprint
 
@@ -995,7 +997,6 @@ private:
   CuckooSettings d_settings;
   size_t d_numBuckets;
   size_t d_numBucketsMask;
-  Fingerprint d_fingerprintMask;
   std::vector<LockGuarded<Bucket>> d_buckets;
   std::mt19937 d_gen;
   time_t d_lastScan;
