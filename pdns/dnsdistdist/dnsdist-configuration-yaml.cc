@@ -1950,7 +1950,22 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
       if (redis.negative_cache_enabled) {
         negativeCache = std::make_shared<GenericCache<std::string, std::string>>(GenericCache<std::string, std::string>::CacheSettings{.d_ttlEnabled = false, .d_ttl = 0, .d_lruEnabled = false});
       }
-      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, std::optional<std::string>(redis.lookup_action), std::optional<std::string>(redis.data_name), redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache, copyCacheFilter, std::make_shared<RedisStats>()));
+      std::optional<std::vector<std::string>> rawArgs = std::nullopt;
+      std::optional<std::vector<std::string>> rawExistsArgs = std::nullopt;
+      // Empty vector is equivalent to nullopt for raw args
+      if (!redis.raw_args.empty()) {
+        rawArgs = std::vector<std::string>(redis.raw_args.size());
+        for (const auto& rawArg : redis.raw_args) {
+          rawArgs->emplace_back(rawArg);
+        }
+      }
+      if (!redis.raw_exists_args.empty()) {
+        rawExistsArgs = std::vector<std::string>(redis.raw_exists_args.size());
+        for (const auto& rawArg : redis.raw_exists_args) {
+          rawExistsArgs->emplace_back(rawArg);
+        }
+      }
+      auto store = std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(client, std::optional<std::string>(redis.lookup_action), std::optional<std::string>(redis.data_name), rawArgs, rawExistsArgs, redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache, copyCacheFilter, std::make_shared<RedisStats>()));
       dnsdist::configuration::yaml::registerType<KeyValueStore>(store, redis.name);
     }
     else {

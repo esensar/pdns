@@ -335,6 +335,14 @@ redis_kv_store:
       type: "String"
       default: ""
       description: "Data name"
+    - name: "raw_args"
+      type: "Vec<String>"
+      default: true
+      description: "Arguments to be used for raw lookup action"
+    - name: "raw_exists_args"
+      type: "Vec<String>"
+      default: true
+      description: "Arguments to be used for raw lookup action when checking if a key exists"
     - name: "copy_cache_enabled"
       type: "bool"
       default: "true"
