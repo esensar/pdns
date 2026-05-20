@@ -153,6 +153,7 @@ common_sources += files(
   src_dir / 'dnsdist-lua-bindings-dnscrypt.cc',
   src_dir / 'dnsdist-lua-bindings-dnsparser.cc',
   src_dir / 'dnsdist-lua-bindings-dnsquestion.cc',
+  src_dir / 'dnsdist-lua-bindings-cache.cc',
   src_dir / 'dnsdist-lua-bindings-kvs.cc',
   src_dir / 'dnsdist-lua-bindings-network.cc',
   src_dir / 'dnsdist-lua-bindings-packetcache.cc',
@@ -524,6 +525,7 @@ test_sources += files(
   src_dir / 'test-channel.cc',
   src_dir / 'test-connectionmanagement_hh.cc',
   src_dir / 'test-credentials_cc.cc',
+  src_dir / 'test-cuckoo-filter.cc',
   src_dir / 'test-delaypipe_hh.cc',
   src_dir / 'test-dns_cc.cc',
   src_dir / 'test-dnscrypt_cc.cc',
@@ -599,6 +601,7 @@ if get_option('unit-tests')
 endif
 
 benchmark_sources = files(
+  src_dir / 'bench-cuckoo-filter_cc.cc',
   src_dir / 'bench-dnsdist-action-rcode.cc',
   src_dir / 'bench-dnsdist-cache.cc',
   src_dir / 'bench-dnsdist-dnsparser_cc.cc',

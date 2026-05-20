@@ -212,6 +212,7 @@ dnsdist_SOURCES = \
 	dnsdist-lbpolicies.cc dnsdist-lbpolicies.hh \
 	dnsdist-logging.cc dnsdist-logging.hh \
 	dnsdist-lua-actions.cc \
+	dnsdist-lua-bindings-cache.cc \
 	dnsdist-lua-bindings-dnscrypt.cc \
 	dnsdist-lua-bindings-dnsparser.cc \
 	dnsdist-lua-bindings-dnsquestion.cc \
@@ -231,7 +232,7 @@ dnsdist_SOURCES = \
 	dnsdist-lua-rules.cc \
 	dnsdist-lua-vars.cc \
 	dnsdist-lua-web.cc \
-	dnsdist-lua.cc dnsdist-lua.hh \
+	dnsdist-lua.cc dnsdist-lua.hh dnsdist-lua-types.hh \
 	dnsdist-mac-address.cc dnsdist-mac-address.hh \
 	dnsdist-metrics.cc dnsdist-metrics.hh \
 	dnsdist-nghttp2-in.hh \
@@ -281,6 +282,8 @@ dnsdist_SOURCES = \
 	ext/libbpf/libbpf.h \
 	ext/luawrapper/include/LuaContext.hpp \
 	fstrm_logger.cc fstrm_logger.hh \
+	generic-cache.hh \
+	generic-cache-interface.hh \
 	gettime.cc gettime.hh \
 	htmlfiles.h \
 	iputils.cc iputils.hh \
@@ -390,6 +393,8 @@ testrunner_SOURCES = \
 	ext/json11/json11.cpp \
 	ext/json11/json11.hpp \
 	ext/luawrapper/include/LuaContext.hpp \
+	generic-cache.hh \
+	generic-cache-interface.hh \
 	gettime.cc gettime.hh \
 	iputils.cc iputils.hh \
 	logging.cc logging.hh \
@@ -411,6 +416,7 @@ testrunner_SOURCES = \
 	test-channel.cc \
 	test-connectionmanagement_hh.cc \
 	test-credentials_cc.cc \
+	test-cuckoo-filter.cc \
 	test-delaypipe_hh.cc \
 	test-dns_cc.cc \
 	test-dnscrypt_cc.cc \

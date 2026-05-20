@@ -483,8 +483,8 @@ static void setupLuaConfig(LuaContext& luaCtx, bool client, bool configCheck)
 #if defined(MSG_FASTOPEN) || defined(CONNECTX_FASTOPEN)
                              config.tcpFastOpen = true;
 #else
-                             SLOG(warnlog("TCP Fast Open has been configured on downstream server %s but is not supported", serverAddressStr),
-                                  getLogger("newServer")->info(Logr::Warning, "TCP Fast Open has been configured on downstream backend but is not supported", "backend.address", Logging::Loggable(serverAddressStr)));
+          SLOG(warnlog("TCP Fast Open has been configured on downstream server %s but is not supported", serverAddressStr),
+               getLogger("newServer")->info(Logr::Warning, "TCP Fast Open has been configured on downstream backend but is not supported", "backend.address", Logging::Loggable(serverAddressStr)));
 #endif
                            }
                          }
@@ -530,9 +530,9 @@ static void setupLuaConfig(LuaContext& luaCtx, bool client, bool configCheck)
 #ifdef HAVE_SSL_CTX_SET_KEYLOG_CALLBACK
                            getOptionalValue<std::string>(vars, "keyLogFile", config.d_tlsParams.d_keyLogFile);
 #else
-                           SLOG(errlog("TLS Key logging has been enabled using the 'keyLogFile' parameter to newServer(), but this version of OpenSSL does not support it"),
-                                getLogger("newServer")->info(Logr::Error, "TLS Key logging has been enabled using the 'keyLogFile' parameter to newServer(), but this version of OpenSSL does not support it", "backend.address", Logging::Loggable(serverAddressStr)));
-                           g_outputBuffer = "TLS Key logging has been enabled using the 'keyLogFile' parameter to newServer(), but this version of OpenSSL does not support it";
+        SLOG(errlog("TLS Key logging has been enabled using the 'keyLogFile' parameter to newServer(), but this version of OpenSSL does not support it"),
+             getLogger("newServer")->info(Logr::Error, "TLS Key logging has been enabled using the 'keyLogFile' parameter to newServer(), but this version of OpenSSL does not support it", "backend.address", Logging::Loggable(serverAddressStr)));
+        g_outputBuffer = "TLS Key logging has been enabled using the 'keyLogFile' parameter to newServer(), but this version of OpenSSL does not support it";
 #endif
                          }
 
@@ -681,10 +681,10 @@ static void setupLuaConfig(LuaContext& luaCtx, bool client, bool configCheck)
                            getOptionalValue<LuaArray<std::shared_ptr<XskSocket>>>(vars, "xskSockets", luaXskSockets);
                          }
 #else /* HAVE_XSK */
-                         if (!(client || configCheck)) {
-                           SLOG(infolog("Added downstream server %s", ret->d_config.remote.toStringWithPort()),
-                                getLogger("newServer")->info(Logr::Info, "Added downstream server", "backend.address", Logging::Loggable(ret->d_config.remote)));
-                         }
+      if (!(client || configCheck)) {
+        SLOG(infolog("Added downstream server %s", ret->d_config.remote.toStringWithPort()),
+             getLogger("newServer")->info(Logr::Info, "Added downstream server", "backend.address", Logging::Loggable(ret->d_config.remote)));
+      }
 #endif /* HAVE_XSK */
                          if (autoUpgrade && ret->getProtocol() != dnsdist::Protocol::DoT && ret->getProtocol() != dnsdist::Protocol::DoH) {
                            dnsdist::ServiceDiscovery::addUpgradeableServer(ret, upgradeInterval, std::move(upgradePool), upgradeDoHKey, keepAfterUpgrade);
@@ -3324,6 +3324,7 @@ void setupLuaBindingsOnly(LuaContext& luaCtx, bool client, bool configCheck)
   });
 
   setupLuaBindings(luaCtx, client, configCheck);
+  setupLuaBindingsCache(luaCtx);
   setupLuaBindingsDNSCrypt(luaCtx, client);
   setupLuaBindingsDNSParser(luaCtx);
   setupLuaBindingsDNSQuestion(luaCtx);
