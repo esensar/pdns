@@ -36,6 +36,7 @@
 #include "dnsdist-query-count.hh"
 #include "dnsdist-rule-chains.hh"
 #include "dnsdist-server-pool.hh"
+#include "generic-cache-interface.hh"
 #include "iputils.hh"
 #include "remote_logger.hh"
 #include "redis-stats.hh"
@@ -138,6 +139,7 @@ struct RuntimeConfiguration
 #ifdef HAVE_REDIS
   std::unordered_map<std::string, std::shared_ptr<RedisStats>> d_redisStats;
 #endif /* HAVE_REDIS */
+  std::unordered_map<std::string, std::shared_ptr<GenericCacheInterface<std::string, std::optional<LuaAny>>>> d_caches;
   std::shared_ptr<const CredentialsHolder> d_webPassword;
   std::shared_ptr<const CredentialsHolder> d_webAPIKey;
   std::optional<std::unordered_map<std::string, std::string>> d_webCustomHeaders;

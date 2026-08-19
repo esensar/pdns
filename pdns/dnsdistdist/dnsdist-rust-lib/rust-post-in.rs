@@ -73,6 +73,7 @@ fn get_global_configuration_from_serde(
         dynamic_rules_settings: serde.dynamic_rules_settings,
         ebpf: serde.ebpf,
         edns_client_subnet: serde.edns_client_subnet,
+        generic_caches: serde.generic_caches,
         general: serde.general,
         mmdbs: serde.mmdbs,
         key_value_stores: serde.key_value_stores,
@@ -101,6 +102,7 @@ fn get_global_configuration_from_serde(
     dnsdistsettings::registerMMDBObjects(&config.mmdbs)?;
     // this needs to be done before the KVS so they can refer to the redis clients
     dnsdistsettings::registerRedisClientObjects(&config.redis_clients)?;
+    dnsdistsettings::registerGenericCacheObjects(&config.generic_caches)?;
     // this needs to be done before the rules so that they can refer to the KVS objects
     dnsdistsettings::registerKVSObjects(&config.key_value_stores)?;
     // this needs to be done before the rules so that they can refer to the NMG objects
