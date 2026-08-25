@@ -78,6 +78,20 @@ void setupLuaBindingsRedis([[maybe_unused]] LuaContext& luaCtx, [[maybe_unused]]
     return result;
   });
 
+  luaCtx.registerFunction<LuaAssociativeTable<std::string> (std::shared_ptr<RedisClient>::*)(const std::string&)>("hgetall", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key) {
+    if (!rc) {
+      return LuaAssociativeTable<std::string>();
+    }
+
+    auto reply = RedisHGetAllCommand{}(*rc, hash_key);
+
+    if (reply->ok()) {
+      return reply->getValue();
+    }
+
+    return LuaAssociativeTable<std::string>();
+  });
+
   luaCtx.registerFunction<bool (std::shared_ptr<RedisClient>::*)(const std::string&, const std::string&)>("hexists", [](std::shared_ptr<RedisClient>& rc, const std::string& hash_key, const std::string& key) {
     if (!rc) {
       return false;

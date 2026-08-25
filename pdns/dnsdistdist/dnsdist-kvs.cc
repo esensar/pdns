@@ -387,7 +387,7 @@ bool MMDBKVStore::getValue(const std::string& key, std::string& value)
 
 #ifdef HAVE_REDIS
 
-RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std::optional<std::string> lookupAction, std::optional<std::string> dataName, std::shared_ptr<RedisStats> stats) :
+RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std::optional<std::string> lookupAction, std::optional<std::string> dataName, bool copyCacheEnabled, unsigned int copyCacheTtl, std::shared_ptr<GenericCacheInterface<std::string, std::optional<LuaAny>>> resultCache, std::shared_ptr<GenericFilterInterface<std::string>> negativeCache, std::shared_ptr<GenericFilterInterface<std::string>> copyCacheFilter, std::shared_ptr<RedisStats> stats) :
   d_stats(stats)
 {
   std::unique_ptr<RedisLookupAction> command;
@@ -411,6 +411,20 @@ RedisKVStore::RedisKVStore(const std::shared_ptr<RedisClient>& redisClient, std:
     }
   }
   d_redis = std::make_unique<RedisKVClient>(redisClient, std::move(command), stats);
+  if (negativeCache) {
+    d_redis = std::make_unique<NegativeCachingRedisClient>(std::move(d_redis), negativeCache);
+  }
+  if (resultCache) {
+    d_redis = std::make_unique<ResultCachingRedisClient>(std::move(d_redis), resultCache);
+  }
+  if (copyCacheEnabled) {
+    if (copyCacheFilter) {
+      d_redis = std::make_unique<FilteringCopyCachingRedisClient>(std::move(d_redis), copyCacheTtl, copyCacheFilter);
+    }
+    else {
+      d_redis = std::make_unique<CopyCachingRedisClient>(std::move(d_redis), copyCacheTtl);
+    }
+  }
 }
 
 bool RedisKVStore::reload()

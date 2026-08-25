@@ -466,3 +466,614 @@ class TestRedisYamlHGetAndGetWithDataName(RedisYamlTest, RedisHGet):
     def setUpClass(cls):
         cls.setUpRedis()
         super(TestRedisYamlHGetAndGetWithDataName, cls).setUpClass()
+
+
+@unittest.skipIf("SKIP_REDIS_TESTS" in os.environ, "Redis tests are disabled")
+class RedisCachingTest(RedisTest):
+    _redisPort = pickAvailablePort()
+    _copyCacheEnabled = "false"
+    _config_template = """
+    newServer{address="127.0.0.1:%d"}
+
+    dataName = "%s"
+    resultCache = newObjectCache("redisResultCache", { maxEntries = 1000 })
+    negativeCache = newObjectCache("redisNegativeCache", { maxEntries = 1000 })
+    redis = newRedisClient("redis://127.0.0.1:%d")
+    kvs = newRedisKVStore(redis, { lookupAction = "%s", dataName = dataName, resultCache = resultCache, negativeCache = negativeCache, copyCacheEnabled = %s, copyCacheTtl = 100 })
+
+    -- does a lookup in the Redis database using the qname as key, and store the result into the 'kvs-qname-result' tag
+    addAction(RegexRule('kvs.*'), KeyValueStoreLookupAction(kvs, KeyValueLookupKeyQName(false), 'kvs-qname-result'))
+
+    -- if the value of the 'kvs-qname-result' is set to 'test-result', spoof a response
+    addAction(TagRule('kvs-qname-result', 'test-result'), SpoofAction('5.6.7.8'))
+
+    -- otherwise, spoof a different response
+    addAction(RegexRule('kvs.*'), SpoofAction('9.9.9.9'))
+    """
+    _config_params = ["_testServerPort", "_dataName", "_redisPort", "_lookupAction", "_copyCacheEnabled"]
+
+
+class TestRedisGetWithCache(RedisCachingTest):
+    _lookupAction = "get"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisGetWithCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+        cls._redis.set("kvs.correct.tests.powerdns.com", "test-result")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisGetWithCache, cls).setUpClass()
+
+    def testRedisGetKvs(self):
+        """
+        Redis: Match on Qname in KVS and store result in cache
+        """
+        # First run a regular query, it should retrieve the data
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Now remove the key from redis
+        self._redis.delete("kvs.correct.tests.powerdns.com")
+
+        # Retry, we should still get the correct response, because we have it cached
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisGetWithNegativeCache(RedisCachingTest):
+    _lookupAction = "get"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisGetWithNegativeCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisGetWithNegativeCache, cls).setUpClass()
+
+    def testRedisGetKvs(self):
+        """
+        Redis: Match on Qname in KVS and store result in negative cache
+        """
+        # The query should return 9.9.9.9 since the value is not in redis
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "9.9.9.9")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Store the value
+        self._redis.set("kvs.correct.tests.powerdns.com", "test-result")
+
+        # Another query should return the same, because this key is stored in
+        # negative cache
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisHGetWithCache(RedisCachingTest):
+    _lookupAction = "hget"
+    _dataName = "test_hash"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisHGetWithCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+        cls._redis.hset("test_hash", "kvs.correct.tests.powerdns.com", "test-result")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisHGetWithCache, cls).setUpClass()
+
+    def testRedisHGetKvs(self):
+        """
+        Redis: Match on Qname in KVS and store result in cache
+        """
+        # First run a regular query, it should retrieve the data
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Now remove the key from redis
+        self._redis.delete("test_hash")
+
+        # Retry, we should still get the correct response, because we have it cached
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisHGetWithNegativeCache(RedisCachingTest):
+    _lookupAction = "hget"
+    _dataName = "test_hash"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisHGetWithNegativeCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisHGetWithNegativeCache, cls).setUpClass()
+
+    def testRedisHGetKvs(self):
+        """
+        Redis: Match on Qname in KVS and store result in negative cache
+        """
+        # The query should return 9.9.9.9 since the value is not in redis
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "9.9.9.9")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Store the value
+        self._redis.hset("test_hash", "kvs.correct.tests.powerdns.com", "test-result")
+
+        # Another query should return the same, because this key is stored in
+        # negative cache
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisHGetWithCopyCache(RedisCachingTest):
+    _lookupAction = "hget"
+    _dataName = "test_hash"
+    _copyCacheEnabled = "true"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisHGetWithCopyCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+        cls._redis.hset("test_hash", "kvs.correct.tests.powerdns.com", "test-result")
+        cls._redis.hset("test_hash", "kvs.other.tests.powerdns.com", "test-result")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisHGetWithCopyCache, cls).setUpClass()
+
+    def testRedisHGetKvs(self):
+        """
+        Redis: Match on Qname in KVS and store result in copy cache
+        """
+        # First run a regular query, it should retrieve the data
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Now remove the key from redis
+        self._redis.delete("test_hash")
+
+        # Retry, we should still get the correct response, because we have it cached
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Then check the other key that was stored in the same hash - it should
+        # be stored in the copy cache
+        name = "kvs.other.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+@unittest.skipIf("SKIP_REDIS_TESTS" in os.environ, "Redis tests are disabled")
+class RedisCachingYamlTest(RedisYamlTest):
+    _copyCacheEnabled = "false"
+    _verboseMode = True
+    _yaml_config_template = """---
+backends:
+  - address: "127.0.0.1:%d"
+    protocol: Do53
+
+redis_clients:
+  - name: test-redis
+    url: redis://127.0.0.1:%d
+
+generic_caches:
+  object:
+    - name: "result-cache"
+      max_entries: 1000
+    - name: "negative-cache"
+      max_entries: 1000
+
+key_value_stores:
+  redis:
+    - name: RedisKV
+      redis_client: test-redis
+      lookup_action: %s
+      data_name: %s
+      result_cache: "result-cache"
+      negative_cache: "negative-cache"
+      copy_cache_enabled: %s
+      copy_cache_ttl: 100
+  lookup_keys:
+    qname_keys:
+      - name: qname
+        wire_format: false
+
+query_rules:
+  - name: Redis KV Rule
+    selector:
+      type: Regex
+      expression: kvs.*
+    action:
+      type: KeyValueStoreLookup
+      kvs_name: RedisKV
+      lookup_key_name: qname
+      destination_tag: kvs-qname-result
+
+  - name: Spoof KV test rule
+    selector:
+      type: Tag
+      tag: kvs-qname-result
+      value: test-result
+    action:
+      type: Spoof
+      ips:
+        - 5.6.7.8
+
+  - name: Spoof KV missed rule
+    selector:
+      type: Regex
+      expression: kvs.*
+    action:
+      type: Spoof
+      ips:
+        - 9.9.9.9
+"""
+    _yaml_config_params = ["_testServerPort", "_redisPort", "_lookupAction", "_dataName", "_copyCacheEnabled"]
+
+    @classmethod
+    def setUpRedis(cls):
+        print("Configuring Redis for YAML test")
+        cls._redisPort = pickAvailablePort()
+        cls._redisServer = fakeredis.TcpFakeServer(("localhost", cls._redisPort))
+        cls._redisThread = Thread(target=cls._redisServer.serve_forever, daemon=True)
+        cls._redisThread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        super(RedisYamlTest, cls).tearDownClass()
+        cls._redisServer.shutdown()
+        cls._redisThread.join()
+
+
+class TestRedisYamlGetWithCache(RedisCachingYamlTest):
+    _lookupAction = "get"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisYamlGetWithCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+        cls._redis.set("kvs.correct.tests.powerdns.com", "test-result")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisYamlGetWithCache, cls).setUpClass()
+
+    def testRedisYamlGetKvs(self):
+        """
+        RedisYaml: Match on Qname in KVS and store result in cache
+        """
+        # First run a regular query, it should retrieve the data
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Now remove the key from redis
+        self._redis.delete("kvs.correct.tests.powerdns.com")
+
+        # Retry, we should still get the correct response, because we have it cached
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisYamlGetWithNegativeCache(RedisCachingYamlTest):
+    _lookupAction = "get"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisYamlGetWithNegativeCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisYamlGetWithNegativeCache, cls).setUpClass()
+
+    def testRedisYamlGetKvs(self):
+        """
+        RedisYaml: Match on Qname in KVS and store result in negative cache
+        """
+        # The query should return 9.9.9.9 since the value is not in redis
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "9.9.9.9")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Store the value
+        self._redis.set("kvs.correct.tests.powerdns.com", "test-result")
+
+        # Another query should return the same, because this key is stored in
+        # negative cache
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisYamlHGetWithCache(RedisCachingYamlTest):
+    _lookupAction = "hget"
+    _dataName = "test_hash"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisYamlHGetWithCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+        cls._redis.hset("test_hash", "kvs.correct.tests.powerdns.com", "test-result")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisYamlHGetWithCache, cls).setUpClass()
+
+    def testRedisYamlHGetKvs(self):
+        """
+        RedisYaml: Match on Qname in KVS and store result in cache
+        """
+        # First run a regular query, it should retrieve the data
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Now remove the key from redis
+        self._redis.delete("test_hash")
+
+        # Retry, we should still get the correct response, because we have it cached
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisYamlHGetWithNegativeCache(RedisCachingYamlTest):
+    _lookupAction = "hget"
+    _dataName = "test_hash"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisYamlHGetWithNegativeCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisYamlHGetWithNegativeCache, cls).setUpClass()
+
+    def testRedisYamlHGetKvs(self):
+        """
+        RedisYaml: Match on Qname in KVS and store result in negative cache
+        """
+        # The query should return 9.9.9.9 since the value is not in redis
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "9.9.9.9")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Store the value
+        self._redis.hset("test_hash", "kvs.correct.tests.powerdns.com", "test-result")
+
+        # Another query should return the same, because this key is stored in
+        # negative cache
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+
+class TestRedisYamlHGetWithCopyCache(RedisCachingYamlTest):
+    _lookupAction = "hget"
+    _dataName = "test_hash"
+    _copyCacheEnabled = "true"
+
+    @classmethod
+    def setUpRedis(cls):
+        super(TestRedisYamlHGetWithCopyCache, cls).setUpRedis()
+        cls._redis = fakeredis.FakeStrictRedis(server=cls._redisServer.fake_server)
+        cls._redis.hset("test_hash", "kvs.correct.tests.powerdns.com", "test-result")
+        cls._redis.hset("test_hash", "kvs.other.tests.powerdns.com", "test-result")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.setUpRedis()
+        super(TestRedisYamlHGetWithCopyCache, cls).setUpClass()
+
+    def testRedisYamlHGetKvs(self):
+        """
+        RedisYaml: Match on Qname in KVS and store result in copy cache
+        """
+        # First run a regular query, it should retrieve the data
+        name = "kvs.correct.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Now remove the key from redis
+        self._redis.delete("test_hash")
+
+        # Retry, we should still get the correct response, because we have it cached
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)
+
+        # Then check the other key that was stored in the same hash - it should
+        # be stored in the copy cache
+        name = "kvs.other.tests.powerdns.com."
+        query = dns.message.make_query(name, "A", "IN")
+        # dnsdist set RA = RD for spoofed responses
+        query.flags &= ~dns.flags.RD
+        expectedResponse = dns.message.make_response(query)
+        rrset = dns.rrset.from_text(name, 3600, dns.rdataclass.IN, dns.rdatatype.A, "5.6.7.8")
+        expectedResponse.answer.append(rrset)
+
+        for method in ("sendUDPQuery", "sendTCPQuery"):
+            sender = getattr(self, method)
+            (receivedQuery, receivedResponse) = sender(query, response=None, useQueue=False)
+            self.assertFalse(receivedQuery)
+            self.assertTrue(receivedResponse)
+            self.assertEqual(expectedResponse, receivedResponse)

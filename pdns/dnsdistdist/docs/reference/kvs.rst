@@ -151,6 +151,11 @@ If the value found in the LMDB database for the key '\\8powerdns\\3com\\0' was '
 
   * ``lookupAction``: str - Command to use when looking up keys in Redis. Check below for supported lookup actions.
   * ``dataName``: str - Additional value with different behavior depending on the lookup action.
+  * ``copyCacheEnabled``: bool - Whether to use the copy cache. Copy cache preloads related data from Redis and uses cached data until TTL expires.
+  * ``copyCacheTtl``: int - TTL of the copy cache.
+  * ``copyCacheFilter``: GenericCache - Generic cache instance to use in place of copy cache, to support usage as a filter.
+  * ``resultCache``: GenericCache - Generic cache instance to use to store Redis results.
+  * ``negativeCachce``: GenericCache - Generic cache instance to use to store keys that are known to not be present.
 
   Lookup actions:
 

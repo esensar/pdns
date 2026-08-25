@@ -2688,6 +2688,13 @@ Redis
     :param str key: Field in hash to look up.
     :returns: The string value.
 
+  .. method:: hgetall(hash_key)
+
+    Returns the table of all values in the hash stored at hash_key in Redis, if it exists (HGETALL command).
+
+    :param str hash_key: Key the hash is stored at.
+    :returns: A Lua table representing all values of the hash.
+
   .. method:: hexists(hash_key, key)
 
     Checks if the given field exists in hash stored at hash_key in Redis (HEXISTS command).

@@ -2117,7 +2117,7 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
       dataName = std::string(redis.data_name);
     }
 
-    std::string uniqueId = "url=" + definedRedis->getUrl().to_string() + ",action=" + lookupAction.value_or("GET") + ",data-name=" + dataName.value_or("") + ",";
+    std::string uniqueId = "url=" + definedRedis->getUrl().to_string() + ",action=" + lookupAction.value_or("GET") + ",data-name=" + dataName.value_or("") + ",copy-cache=" + (redis.copy_cache_enabled ? "true" : "false") + ",";
     std::string labels = "redis-server=" + definedRedis->getUrl().host + ":" + std::to_string(definedRedis->getUrl().port) + ",redis-action=" + lookupAction.value_or("GET") + ",data-name=" + dataName.value_or("");
     std::shared_ptr<RedisStats> stats = std::make_shared<RedisStats>(labels);
 
@@ -2127,7 +2127,28 @@ void registerKVSObjects([[maybe_unused]] const KeyValueStoresConfiguration& conf
       }
       runtimeConfig.d_redisStats.emplace(uniqueId, std::shared_ptr(stats));
     });
-    auto store = createObjects ? std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(definedRedis, lookupAction, dataName, stats)) : std::shared_ptr<KeyValueStore>();
+    auto copyFilter = std::shared_ptr<GenericCacheInterface<std::string, std::optional<LuaAny>>>();
+    if (!redis.copy_cache_filter.empty() && createObjects) {
+      copyFilter = dnsdist::configuration::yaml::getRegisteredTypeByName<GenericCacheInterface<std::string, std::optional<LuaAny>>>(redis.copy_cache_filter);
+      if (!copyFilter) {
+        throw std::runtime_error("Unable to find a generic object cache named " + std::string(redis.copy_cache_filter));
+      }
+    }
+    auto resultCache = std::shared_ptr<GenericCacheInterface<std::string, std::optional<LuaAny>>>();
+    if (!redis.result_cache.empty() && createObjects) {
+      resultCache = dnsdist::configuration::yaml::getRegisteredTypeByName<GenericCacheInterface<std::string, std::optional<LuaAny>>>(redis.result_cache);
+      if (!resultCache) {
+        throw std::runtime_error("Unable to find a generic object cache named " + std::string(redis.result_cache));
+      }
+    }
+    auto negativeCache = std::shared_ptr<GenericCacheInterface<std::string, std::optional<LuaAny>>>();
+    if (!redis.negative_cache.empty() && createObjects) {
+      negativeCache = dnsdist::configuration::yaml::getRegisteredTypeByName<GenericCacheInterface<std::string, std::optional<LuaAny>>>(redis.negative_cache);
+      if (!negativeCache) {
+        throw std::runtime_error("Unable to find a generic object cache named " + std::string(redis.negative_cache));
+      }
+    }
+    auto store = createObjects ? std::shared_ptr<KeyValueStore>(std::make_shared<RedisKVStore>(definedRedis, lookupAction, dataName, redis.copy_cache_enabled, redis.copy_cache_ttl, resultCache, negativeCache, copyFilter, stats)) : std::shared_ptr<KeyValueStore>();
     dnsdist::configuration::yaml::registerType<KeyValueStore>(store, redis.name);
   }
 #endif /* defined(HAVE_REDIS) */
